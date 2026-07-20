@@ -125,6 +125,7 @@
         
         <label for="gh-token">Token d'accès personnel (PAT)</label>
         <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxx">
+        <button class="btn" onclick="ouvrirDepotsGithub()" style="background-color: #6e6e73; margin-bottom: 10px;">📂 Voir mes dépôts GitHub</button>
         <button class="btn" onclick="sauvegarderConfig()">Enregistrer les identifiants</button>
     </div>
 
@@ -190,6 +191,17 @@
         config.token = document.getElementById('gh-token').value.trim();
         localStorage.setItem('deployer_config', JSON.stringify(config));
         afficherMessage("Identifiants enregistrés localement avec succès !", "success");
+    }
+
+    // Ouvre la page GitHub listant tous les dépôts du compte
+    function ouvrirDepotsGithub() {
+        const user = document.getElementById('gh-user').value.trim();
+        if(!user) {
+            afficherMessage("Renseigne d'abord ton nom d'utilisateur GitHub ci-dessus.", "error");
+            document.getElementById('gh-user').focus();
+            return;
+        }
+        window.open(`https://github.com/${user}?tab=repositories`, '_blank');
     }
 
     function rafraichirCiblesUI() {
