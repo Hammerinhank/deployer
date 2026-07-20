@@ -48,6 +48,7 @@
             font-size: 16px;
         }
         .btn:active { background-color: #005bb5; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-secondary { background-color: #34c759; margin-top: 5px; }
         .btn-secondary:active { background-color: #248a3d; }
         .status {
@@ -71,6 +72,42 @@
             font-size: 14px;
         }
         .delete-btn { color: #ff3b30; background: none; border: none; font-weight: bold; cursor: pointer; }
+
+        /* Styles de l'historique */
+        .commit-item {
+            background: #f5f5f7;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        .commit-item.current { border: 2px solid #34c759; }
+        .commit-date { font-weight: 600; color: #1d1d1f; }
+        .commit-msg { color: #86868b; font-size: 13px; margin: 4px 0 10px 0; word-break: break-word; }
+        .commit-badge {
+            display: inline-block;
+            background: #34c759;
+            color: white;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+        .commit-actions { display: flex; gap: 8px; }
+        .btn-small {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-view { background-color: #e5e5ea; color: #1d1d1f; }
+        .btn-restore { background-color: #ff9500; color: white; }
+        .btn-restore:active { background-color: #c93400; }
     </style>
 </head>
 <body>
@@ -113,6 +150,17 @@
         <button class="btn" onclick="deployerCode()" style="background-color: #5856d6;">Mettre à jour sur GitHub</button>
     </div>
 
+    <!-- 4. HISTORIQUE & RESTAURATION -->
+    <div class="card">
+        <h2>4. Historique &amp; Restauration</h2>
+        <label for="select-history-target">Application concernée</label>
+        <select id="select-history-target"></select>
+
+        <button class="btn" id="btn-history" onclick="chargerHistorique()" style="background-color: #ff9500;">Charger l'historique</button>
+
+        <div id="history-list" style="margin-top: 15px;"></div>
+    </div>
+
     <!-- ZONE DE STATUS -->
     <div id="status-box" class="status"></div>
 </div>
@@ -142,13 +190,15 @@
     function rafraichirCiblesUI() {
         const listDiv = document.getElementById('target-list');
         const select = document.getElementById('select-target');
+        const selectHistory = document.getElementById('select-history-target');
         
         listDiv.innerHTML = cibles.length === 0 ? "<p style='color:#86868b; font-size:14px; margin:0;'>Aucune cible enregistrée.</p>" : "";
         select.innerHTML = "";
+        selectHistory.innerHTML = "";
 
         cibles.forEach((cible, index) => {
             // Détermination dynamique de l'URL d'archivage sur GitHub
-            const repoUrl = `https://github.com/${config.user || 'Hammerinhank'}/${cible.repo}`;
+            const repoUrl = `https://github.com/${config.user || ''}/${cible.repo}`;
 
             // Remplir la liste de gestion avec le lien cliquable sur le nom
             listDiv.innerHTML += `
@@ -157,11 +207,13 @@
                     <button class="delete-btn" onclick="supprimerCible(${index})">Supprimer</button>
                 </div>`;
             
-            // Remplir le menu déroulant
-            const opt = document.createElement('option');
-            opt.value = cible.repo;
-            opt.textContent = cible.name;
-            select.appendChild(opt);
+            // Remplir les deux menus déroulants (déploiement + historique)
+            [select, selectHistory].forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = cible.repo;
+                opt.textContent = cible.name;
+                s.appendChild(opt);
+            });
         });
     }
 
@@ -189,14 +241,40 @@
         rafraichirCiblesUI();
     }
 
+    // ---------- OUTILS COMMUNS ----------
+
+    function headersGitHub() {
+        return {
+            "Authorization": `token ${config.token}`,
+            "Accept": "application/vnd.github.v3+json"
+        };
+    }
+
+    // Encodage texte -> Base64 (gestion des accents et émojis)
+    function encoderBase64(texte) {
+        return btoa(unescape(encodeURIComponent(texte)));
+    }
+
+    // Décodage Base64 -> texte (l'API GitHub insère des sauts de ligne dans le Base64, on les retire)
+    function decoderBase64(b64) {
+        return decodeURIComponent(escape(atob(b64.replace(/\n/g, ''))));
+    }
+
+    function verifierConfig() {
+        if(!config.user || !config.token) {
+            afficherMessage("Erreur : Configure tes identifiants GitHub à l'étape 1 d'abord.", "error");
+            return false;
+        }
+        return true;
+    }
+
+    // ---------- DÉPLOIEMENT ----------
+
     async function deployerCode() {
         const repo = document.getElementById('select-target').value;
         const code = document.getElementById('html-code').value;
 
-        if(!config.user || !config.token) {
-            afficherMessage("Erreur : Configure tes identifiants GitHub à l'étape 1 d'abord.", "error");
-            return;
-        }
+        if(!verifierConfig()) return;
         if(!repo) {
             afficherMessage("Erreur : Ajoute et sélectionne une application cible à l'étape 2.", "error");
             return;
@@ -209,16 +287,11 @@
         afficherMessage("Vérification du fichier existant sur GitHub...", "success");
 
         const url = `https://api.github.com/repos/${config.user}/${repo}/contents/index.html`;
-        const headers = {
-            "Authorization": `token ${config.token}`,
-            "Accept": "application/vnd.github.v3+json"
-        };
-
         let sha = null;
 
         // Étape A : On cherche si index.html existe déjà pour obtenir son identifiant unique (SHA)
         try {
-            const reponseCheck = await fetch(url, { headers });
+            const reponseCheck = await fetch(url, { headers: headersGitHub() });
             if (reponseCheck.ok) {
                 const donneesFile = await reponseCheck.json();
                 sha = donneesFile.sha;
@@ -227,8 +300,8 @@
             console.log("Nouveau fichier ou erreur de lecture", err);
         }
 
-        // Étape B : Encodage propre du texte en Base64 (gestion parfaite des accents français et émojis)
-        const codeEncode = btoa(unescape(encodeURIComponent(code)));
+        // Étape B : Encodage propre du texte en Base64
+        const codeEncode = encoderBase64(code);
 
         // Étape C : Envoi de la mise à jour (ou création)
         const bodyPayload = {
@@ -240,7 +313,7 @@
         try {
             const reponsePut = await fetch(url, {
                 method: "PUT",
-                headers: headers,
+                headers: headersGitHub(),
                 body: JSON.stringify(bodyPayload)
             });
 
@@ -253,6 +326,145 @@
             }
         } catch (error) {
             afficherMessage(`Erreur réseau : ${error.message}`, "error");
+        }
+    }
+
+    // ---------- HISTORIQUE & RESTAURATION ----------
+
+    async function chargerHistorique() {
+        const repo = document.getElementById('select-history-target').value;
+        const listDiv = document.getElementById('history-list');
+        const btn = document.getElementById('btn-history');
+
+        if(!verifierConfig()) return;
+        if(!repo) {
+            afficherMessage("Erreur : Ajoute et sélectionne une application cible à l'étape 2.", "error");
+            return;
+        }
+
+        btn.disabled = true;
+        listDiv.innerHTML = "<p style='color:#86868b; font-size:14px;'>Chargement de l'historique...</p>";
+
+        // On récupère les 10 derniers commits qui ont touché index.html
+        const url = `https://api.github.com/repos/${config.user}/${repo}/commits?path=index.html&per_page=10`;
+
+        try {
+            const reponse = await fetch(url, { headers: headersGitHub() });
+            if (!reponse.ok) {
+                const errData = await reponse.json();
+                listDiv.innerHTML = "";
+                afficherMessage(`Impossible de charger l'historique : ${errData.message || reponse.statusText}`, "error");
+                btn.disabled = false;
+                return;
+            }
+
+            const commits = await reponse.json();
+            if (commits.length === 0) {
+                listDiv.innerHTML = "<p style='color:#86868b; font-size:14px;'>Aucune version trouvée pour index.html.</p>";
+                btn.disabled = false;
+                return;
+            }
+
+            listDiv.innerHTML = "";
+            commits.forEach((commit, index) => {
+                const date = new Date(commit.commit.author.date);
+                const dateStr = date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+                    + " à " + date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+                const msg = commit.commit.message;
+                const estActuelle = index === 0;
+
+                const item = document.createElement('div');
+                item.className = 'commit-item' + (estActuelle ? ' current' : '');
+                item.innerHTML = `
+                    <div class="commit-date">${dateStr}${estActuelle ? '<span class="commit-badge">Version actuelle</span>' : ''}</div>
+                    <div class="commit-msg">${msg}</div>
+                    <div class="commit-actions">
+                        <button class="btn-small btn-view">Voir</button>
+                        ${estActuelle ? '' : '<button class="btn-small btn-restore">Restaurer</button>'}
+                    </div>`;
+
+                // On attache les actions sans passer par onclick="" pour éviter les soucis d'échappement
+                item.querySelector('.btn-view').addEventListener('click', () => voirVersion(repo, commit.sha, dateStr));
+                const btnRestore = item.querySelector('.btn-restore');
+                if (btnRestore) {
+                    btnRestore.addEventListener('click', () => restaurerVersion(repo, commit.sha, dateStr));
+                }
+
+                listDiv.appendChild(item);
+            });
+        } catch (error) {
+            listDiv.innerHTML = "";
+            afficherMessage(`Erreur réseau : ${error.message}`, "error");
+        }
+
+        btn.disabled = false;
+    }
+
+    // Récupère le contenu d'index.html tel qu'il était à un commit donné
+    async function recupererContenuVersion(repo, commitSha) {
+        const url = `https://api.github.com/repos/${config.user}/${repo}/contents/index.html?ref=${commitSha}`;
+        const reponse = await fetch(url, { headers: headersGitHub() });
+        if (!reponse.ok) {
+            const errData = await reponse.json();
+            throw new Error(errData.message || reponse.statusText);
+        }
+        const donnees = await reponse.json();
+        return decoderBase64(donnees.content);
+    }
+
+    // Ouvre l'ancienne version dans un nouvel onglet pour vérification visuelle
+    async function voirVersion(repo, commitSha, dateStr) {
+        try {
+            afficherMessage(`Récupération de la version du ${dateStr}...`, "success");
+            const contenu = await recupererContenuVersion(repo, commitSha);
+            const blob = new Blob([contenu], { type: 'text/html' });
+            const blobUrl = URL.createObjectURL(blob);
+            window.open(blobUrl, '_blank');
+            afficherMessage(`Aperçu de la version du ${dateStr} ouvert dans un nouvel onglet.`, "success");
+        } catch (error) {
+            afficherMessage(`Impossible d'afficher cette version : ${error.message}`, "error");
+        }
+    }
+
+    // Restaure une ancienne version : on crée un NOUVEAU commit avec l'ancien contenu.
+    // L'historique reste intact, on ne perd donc jamais rien.
+    async function restaurerVersion(repo, commitSha, dateStr) {
+        if (!confirm(`Restaurer la version du ${dateStr} ?\n\nLa version actuelle restera dans l'historique, tu pourras y revenir.`)) {
+            return;
+        }
+
+        try {
+            afficherMessage("Restauration en cours...", "success");
+
+            // 1. On récupère l'ancien contenu
+            const ancienContenu = await recupererContenuVersion(repo, commitSha);
+
+            // 2. On récupère le SHA du fichier actuel (obligatoire pour la mise à jour)
+            const urlActuel = `https://api.github.com/repos/${config.user}/${repo}/contents/index.html`;
+            const reponseActuel = await fetch(urlActuel, { headers: headersGitHub() });
+            if (!reponseActuel.ok) throw new Error("Impossible de lire le fichier actuel.");
+            const fichierActuel = await reponseActuel.json();
+
+            // 3. On pousse l'ancien contenu comme nouveau commit
+            const reponsePut = await fetch(urlActuel, {
+                method: "PUT",
+                headers: headersGitHub(),
+                body: JSON.stringify({
+                    message: `Restauration de la version du ${dateStr} via Le Déployeur`,
+                    content: encoderBase64(ancienContenu),
+                    sha: fichierActuel.sha
+                })
+            });
+
+            if (reponsePut.ok) {
+                afficherMessage(`Version du ${dateStr} restaurée !\nVotre application sera mise à jour d'ici 30 à 60 secondes.`, "success");
+                chargerHistorique(); // On rafraîchit la liste pour voir le nouveau commit de restauration
+            } else {
+                const errData = await reponsePut.json();
+                afficherMessage(`Échec de la restauration : ${errData.message || reponsePut.statusText}`, "error");
+            }
+        } catch (error) {
+            afficherMessage(`Erreur pendant la restauration : ${error.message}`, "error");
         }
     }
 
