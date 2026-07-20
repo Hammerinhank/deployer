@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Le Déployeur d'Apps</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f5f5f7;
+            color: #1d1d1f;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        .card {
+            background: white;
+            border-radius: 14px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        h2 { font-size: 18px; margin-top: 0; color: #0071e3; }
+        label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; color: #86868b; }
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            font-size: 15px;
+            box-sizing: border-box;
+            background-color: #fbfbfd;
+        }
+        textarea { font-family: monospace; height: 180px; resize: vertical; }
+        .btn {
+            background-color: #0071e3;
+            color: white;
+            font-weight: 600;
+            border: none;
+            padding: 14px;
+            border-radius: 10px;
+            width: 100%;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .btn:active { background-color: #005bb5; }
+        .btn-secondary { background-color: #34c759; margin-top: 5px; }
+        .btn-secondary:active { background-color: #248a3d; }
+        .status {
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            white-space: pre-wrap;
+            display: none;
+        }
+        .success { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+        .error { background-color: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+        .target-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f5f5f7;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .delete-btn { color: #ff3b30; background: none; border: none; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🚀 Le Déployeur</h1>
+
+    <!-- 1. CONFIGURATION GITHUB -->
+    <div class="card">
+        <h2>1. Connexion GitHub</h2>
+        <label for="gh-user">Nom d'utilisateur GitHub</label>
+        <input type="text" id="gh-user" placeholder="Ex: henritavernier">
+        
+        <label for="gh-token">Token d'accès personnel (PAT)</label>
+        <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxx">
+        <button class="btn" onclick="sauvegarderConfig()">Enregistrer les identifiants</button>
+    </div>
+
+    <!-- 2. GESTION DES APPLICATIONS CIBLES -->
+    <div class="card">
+        <h2>2. Gestion des Applications Cibles</h2>
+        <div id="target-list"></div>
+        <hr style="border: 0; border-top: 1px solid #e5e5ea; margin: 15px 0;">
+        <label for="new-target-name">Nom de l'application (Affichage)</label>
+        <input type="text" id="new-target-name" placeholder="Ex: Ma Super Boussole">
+        <label for="new-target-repo">Nom du dépôt sur GitHub</label>
+        <input type="text" id="new-target-repo" placeholder="Ex: boussole">
+        <button class="btn btn-secondary" onclick="ajouterCible()">Ajouter cette cible</button>
+    </div>
+
+    <!-- 3. ZONE DE DÉPLOIEMENT -->
+    <div class="card">
+        <h2>3. Déploiement de Code</h2>
+        <label for="select-target">Choisir l'application à mettre à jour</label>
+        <select id="select-target"></select>
+
+        <label for="html-code">Colle le nouveau code HTML ici</label>
+        <textarea id="html-code" placeholder="<!DOCTYPE html>..."></textarea>
+
+        <button class="btn" onclick="deployerCode()" style="background-color: #5856d6;">Mettre à jour sur GitHub</button>
+    </div>
+
+    <!-- ZONE DE STATUS -->
+    <div id="status-box" class="status"></div>
+</div>
+
+<script>
+    // Chargement initial des données stockées sur l'iPhone
+    let config = JSON.parse(localStorage.getItem('deployer_config')) || { user: '', token: '' };
+    let cibles = JSON.parse(localStorage.getItem('deployer_cibles')) || [];
+
+    document.getElementById('gh-user').value = config.user;
+    document.getElementById('gh-token').value = config.token;
+
+    function afficherMessage(texte, type) {
+        const box = document.getElementById('status-box');
+        box.style.display = 'block';
+        box.className = 'status ' + type;
+        box.textContent = texte;
+    }
+
+    function sauvegarderConfig() {
+        config.user = document.getElementById('gh-user').value.trim();
+        config.token = document.getElementById('gh-token').value.trim();
+        localStorage.setItem('deployer_config', JSON.stringify(config));
+        afficherMessage("Identifiants enregistrés localement avec succès !", "success");
+    }
+
+    function rafraichirCiblesUI() {
+        const listDiv = document.getElementById('target-list');
+        const select = document.getElementById('select-target');
+        
+        listDiv.innerHTML = cibles.length === 0 ? "<p style='color:#86868b; font-size:14px; margin:0;'>Aucune cible enregistrée.</p>" : "";
+        select.innerHTML = "";
+
+        cibles.forEach((cible, index) => {
+            // Remplir la liste de gestion
+            listDiv.innerHTML += `
+                <div class="target-item">
+                    <strong>${cible.name}</strong> (Dépôt : ${cible.repo})
+                    <button class="delete-btn" onclick="supprimerCible(${index})">Supprimer</button>
+                </div>`;
+            
+            // Remplir le menu déroulant
+            const opt = document.createElement('option');
+            opt.value = cible.repo;
+            opt.textContent = cible.name;
+            select.appendChild(opt);
+        });
+    }
+
+    function ajouterCible() {
+        const name = document.getElementById('new-target-name').value.trim();
+        const repo = document.getElementById('new-target-repo').value.trim();
+
+        if(!name || !repo) {
+            afficherMessage("Veuillez remplir les deux champs de la cible.", "error");
+            return;
+        }
+
+        cibles.push({ name: name, repo: repo });
+        localStorage.setItem('deployer_cibles', JSON.stringify(cibles));
+        rafraichirCiblesUI();
+
+        document.getElementById('new-target-name').value = "";
+        document.getElementById('new-target-repo').value = "";
+        afficherMessage(`Cible "${name}" ajoutée !`, "success");
+    }
+
+    function supprimerCible(index) {
+        cibles.splice(index, 1);
+        localStorage.setItem('deployer_cibles', JSON.stringify(cibles));
+        rafraichirCiblesUI();
+    }
+
+    async function deployerCode() {
+        const repo = document.getElementById('select-target').value;
+        const code = document.getElementById('html-code').value;
+
+        if(!config.user || !config.token) {
+            afficherMessage("Erreur : Configure tes identifiants GitHub à l'étape 1 d'abord.", "error");
+            return;
+        }
+        if(!repo) {
+            afficherMessage("Erreur : Ajoute et sélectionne une application cible à l'étape 2.", "error");
+            return;
+        }
+        if(!code.trim()) {
+            afficherMessage("Erreur : La zone de texte contenant le code HTML est vide.", "error");
+            return;
+        }
+
+        afficherMessage("Vérification du fichier existant sur GitHub...", "success");
+
+        const url = `https://api.github.com/repos/${config.user}/${repo}/contents/index.html`;
+        const headers = {
+            "Authorization": `token ${config.token}`,
+            "Accept": "application/vnd.github.v3+json"
+        };
+
+        let sha = null;
+
+        // Étape A : On cherche si index.html existe déjà pour obtenir son identifiant unique (SHA)
+        try {
+            const reponseCheck = await fetch(url, { headers });
+            if (reponseCheck.ok) {
+                const donneesFile = await reponseCheck.json();
+                sha = donneesFile.sha;
+            }
+        } catch (err) {
+            console.log("Nouveau fichier ou erreur de lecture", err);
+        }
+
+        // Étape B : Encodage propre du texte en Base64 (gestion parfaite des accents français et émojis)
+        const codeEncode = btoa(unescape(encodeURIComponent(code)));
+
+        // Étape C : Envoi de la mise à jour (ou création)
+        const bodyPayload = {
+            message: "Mise à jour automatique via Le Déployeur",
+            content: codeEncode
+        };
+        if (sha) bodyPayload.sha = sha; // Obligatoire pour une mise à jour
+
+        try {
+            const reponsePut = await fetch(url, {
+                method: "PUT",
+                headers: headers,
+                body: JSON.stringify(bodyPayload)
+            });
+
+            if (reponsePut.ok) {
+                afficherMessage("Félicitations ! Le code a été poussé sur GitHub.\nVotre application sera mise à jour sur votre iPhone d'ici 30 à 60 secondes.", "success");
+                document.getElementById('html-code').value = ""; // On vide la zone après succès
+            } else {
+                const errData = await reponsePut.json();
+                afficherMessage(`Échec du déploiement : ${errData.message || reponsePut.statusText}`, "error");
+            }
+        } catch (error) {
+            afficherMessage(`Erreur réseau : ${error.message}`, "error");
+        }
+    }
+
+    // Initialisation au chargement de la page
+    rafraichirCiblesUI();
+</script>
+
+</body>
+</html>
