@@ -106,6 +106,8 @@
             cursor: pointer;
         }
         .btn-view { background-color: #e5e5ea; color: #1d1d1f; }
+        .btn-copy { background-color: #0071e3; color: white; }
+        .btn-copy:active { background-color: #005bb5; }
         .btn-restore { background-color: #ff9500; color: white; }
         .btn-restore:active { background-color: #c93400; }
     </style>
@@ -380,11 +382,13 @@
                     <div class="commit-msg">${msg}</div>
                     <div class="commit-actions">
                         <button class="btn-small btn-view">Voir</button>
+                        <button class="btn-small btn-copy">Copier</button>
                         ${estActuelle ? '' : '<button class="btn-small btn-restore">Restaurer</button>'}
                     </div>`;
 
                 // On attache les actions sans passer par onclick="" pour éviter les soucis d'échappement
                 item.querySelector('.btn-view').addEventListener('click', () => voirVersion(repo, commit.sha, dateStr));
+                item.querySelector('.btn-copy').addEventListener('click', (e) => copierVersion(repo, commit.sha, dateStr, e.target));
                 const btnRestore = item.querySelector('.btn-restore');
                 if (btnRestore) {
                     btnRestore.addEventListener('click', () => restaurerVersion(repo, commit.sha, dateStr));
@@ -423,6 +427,40 @@
             afficherMessage(`Aperçu de la version du ${dateStr} ouvert dans un nouvel onglet.`, "success");
         } catch (error) {
             afficherMessage(`Impossible d'afficher cette version : ${error.message}`, "error");
+        }
+    }
+
+    // Copie le code HTML d'une version dans le presse-papier
+    async function copierVersion(repo, commitSha, dateStr, bouton) {
+        try {
+            afficherMessage(`Récupération de la version du ${dateStr}...`, "success");
+            const contenu = await recupererContenuVersion(repo, commitSha);
+
+            // Méthode moderne (nécessite HTTPS, ce qui est le cas sur github.io / Pages)
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(contenu);
+            } else {
+                // Repli pour les contextes non sécurisés
+                const zone = document.createElement('textarea');
+                zone.value = contenu;
+                zone.style.position = 'fixed';
+                zone.style.opacity = '0';
+                document.body.appendChild(zone);
+                zone.focus();
+                zone.select();
+                document.execCommand('copy');
+                document.body.removeChild(zone);
+            }
+
+            // Retour visuel sur le bouton lui-même
+            if (bouton) {
+                const texteOrigine = bouton.textContent;
+                bouton.textContent = "Copié ✓";
+                setTimeout(() => { bouton.textContent = texteOrigine; }, 1500);
+            }
+            afficherMessage(`Code de la version du ${dateStr} copié dans le presse-papier.`, "success");
+        } catch (error) {
+            afficherMessage(`Impossible de copier cette version : ${error.message}`, "error");
         }
     }
 
