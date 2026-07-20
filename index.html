@@ -149,6 +149,9 @@
         <label for="html-code">Colle le nouveau code HTML ici</label>
         <textarea id="html-code" placeholder="<!DOCTYPE html>..."></textarea>
 
+        <label for="commit-comment">Commentaire de version (obligatoire)</label>
+        <input type="text" id="commit-comment" placeholder="Ex : Ajout du bouton de partage">
+
         <button class="btn" onclick="deployerCode()" style="background-color: #5856d6;">Mettre à jour sur GitHub</button>
     </div>
 
@@ -275,6 +278,7 @@
     async function deployerCode() {
         const repo = document.getElementById('select-target').value;
         const code = document.getElementById('html-code').value;
+        const commentaire = document.getElementById('commit-comment').value.trim();
 
         if(!verifierConfig()) return;
         if(!repo) {
@@ -283,6 +287,20 @@
         }
         if(!code.trim()) {
             afficherMessage("Erreur : La zone de texte contenant le code HTML est vide.", "error");
+            return;
+        }
+
+        // Le commentaire de version est OBLIGATOIRE : au moins 3 mots.
+        const nombreDeMots = commentaire.split(/\s+/).filter(m => m.length > 0).length;
+        if(nombreDeMots < 3) {
+            afficherMessage(
+                "⛔ COMMENTAIRE OBLIGATOIRE\n\n" +
+                "Impossible d'enregistrer cette version sans commentaire.\n\n" +
+                "Décris en quelques mots (au moins 3) ce que cette version change. " +
+                "Ce texte sera associé au commit et t'aidera à repérer la version plus tard dans l'historique.",
+                "error"
+            );
+            document.getElementById('commit-comment').focus();
             return;
         }
 
@@ -306,8 +324,9 @@
         const codeEncode = encoderBase64(code);
 
         // Étape C : Envoi de la mise à jour (ou création)
+        // Le commentaire de version devient le message du commit.
         const bodyPayload = {
-            message: "Mise à jour automatique via Le Déployeur",
+            message: commentaire,
             content: codeEncode
         };
         if (sha) bodyPayload.sha = sha; // Obligatoire pour une mise à jour
@@ -322,6 +341,7 @@
             if (reponsePut.ok) {
                 afficherMessage("Félicitations ! Le code a été poussé sur GitHub.\nVotre application sera mise à jour sur votre iPhone d'ici 30 à 60 secondes.", "success");
                 document.getElementById('html-code').value = ""; // On vide la zone après succès
+                document.getElementById('commit-comment').value = ""; // On vide aussi le commentaire
             } else {
                 const errData = await reponsePut.json();
                 afficherMessage(`Échec du déploiement : ${errData.message || reponsePut.statusText}`, "error");
