@@ -147,10 +147,13 @@
         select.innerHTML = "";
 
         cibles.forEach((cible, index) => {
-            // Remplir la liste de gestion
+            // Détermination dynamique de l'URL d'archivage sur GitHub
+            const repoUrl = `https://github.com/${config.user || 'Hammerinhank'}/${cible.repo}`;
+
+            // Remplir la liste de gestion avec le lien cliquable sur le nom
             listDiv.innerHTML += `
                 <div class="target-item">
-                    <strong>${cible.name}</strong> (Dépôt : ${cible.repo})
+                    <strong><a href="${repoUrl}" target="_blank" style="color: #0071e3; text-decoration: none;">${cible.name}</a></strong> (Dépôt : ${cible.repo})
                     <button class="delete-btn" onclick="supprimerCible(${index})">Supprimer</button>
                 </div>`;
             
