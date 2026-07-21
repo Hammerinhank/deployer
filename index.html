@@ -215,8 +215,41 @@
     }
 
     function sauvegarderConfig() {
-        config.user = document.getElementById('gh-user').value.trim();
-        config.token = document.getElementById('gh-token').value.trim();
+        const nouveauUser = document.getElementById('gh-user').value.trim();
+        const nouveauToken = document.getElementById('gh-token').value.trim();
+
+        // Garde-fou 1 : on REFUSE d'enregistrer un champ vide.
+        // C'est le vrai risque : un champ vidé par mégarde écraserait des
+        // identifiants valides. Ici, on ne touche à rien.
+        if (!nouveauUser || !nouveauToken) {
+            afficherMessage(
+                "⛔ Enregistrement annulé — aucun changement effectué.\n\n" +
+                "Le nom d'utilisateur ET le token doivent être remplis tous les deux. " +
+                "Tes identifiants déjà enregistrés sont intacts.",
+                "error"
+            );
+            return;
+        }
+
+        // Garde-fou 2 : si on remplace des identifiants existants par des
+        // valeurs DIFFÉRENTES, on demande une confirmation explicite.
+        // (Si rien ne change, on enregistre sans embêter l'utilisateur.)
+        const remplaceUser = config.user && config.user !== nouveauUser;
+        const remplaceToken = config.token && config.token !== nouveauToken;
+
+        if (remplaceUser || remplaceToken) {
+            const ok = confirm(
+                "Tu vas REMPLACER les identifiants déjà enregistrés par de " +
+                "nouvelles valeurs.\n\nConfirmer le remplacement ?"
+            );
+            if (!ok) {
+                afficherMessage("Remplacement annulé. Tes identifiants précédents sont conservés.", "success");
+                return;
+            }
+        }
+
+        config.user = nouveauUser;
+        config.token = nouveauToken;
         localStorage.setItem('deployer_config', JSON.stringify(config));
         afficherMessage("Identifiants enregistrés localement avec succès !", "success");
     }
