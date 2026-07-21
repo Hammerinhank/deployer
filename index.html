@@ -192,7 +192,8 @@
         
         <label for="gh-token">Token d'accès personnel (PAT)</label>
         <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxx">
-        <button class="btn" onclick="sauvegarderConfig()">Enregistrer les identifiants</button>
+        <button class="btn" onclick="window.open('https://github.com/settings/tokens', '_blank')" style="background-color: #6e6e73;">🔑 Gérer mes tokens GitHub</button>
+        <button class="btn" onclick="sauvegarderConfig()" style="margin-top: 10px;">Enregistrer les identifiants</button>
         <button class="btn" onclick="ouvrirDepotsGithub()" style="background-color: #6e6e73; margin-top: 10px;">📂 Voir mes dépôts GitHub</button>
         <button class="btn" onclick="chargerDescriptifs()" style="background-color: #5856d6; margin-top: 10px;">📝 Liste des descriptifs</button>
         <div id="descriptifs-list" style="margin-top: 15px;"></div>
