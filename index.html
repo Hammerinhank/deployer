@@ -134,6 +134,49 @@
             flex-shrink: 0;
         }
         .btn-edit:active { background-color: #005bb5; }
+
+        /* Fenêtre de confirmation intégrée (remplace le confirm() natif) */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 1000;
+        }
+        .modal-overlay.visible { display: flex; }
+        .modal-box {
+            background: #fff;
+            border-radius: 14px;
+            padding: 24px 22px;
+            max-width: 340px;
+            width: 100%;
+            box-shadow: 0 12px 44px rgba(0,0,0,0.25);
+            text-align: center;
+        }
+        .modal-message {
+            font-size: 15px;
+            line-height: 1.45;
+            color: #1d1d1f;
+            white-space: pre-wrap;
+            margin-bottom: 22px;
+        }
+        .modal-actions { display: flex; gap: 10px; }
+        .modal-btn {
+            flex: 1;
+            padding: 13px;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .modal-btn-cancel { background: #e5e5ea; color: #1d1d1f; }
+        .modal-btn-cancel:active { background: #d1d1d6; }
+        .modal-btn-confirm { background: #0071e3; color: #fff; }
+        .modal-btn-confirm:active { background: #005bb5; }
     </style>
 </head>
 <body>
@@ -197,6 +240,17 @@
     <div id="status-box" class="status"></div>
 </div>
 
+<!-- Fenêtre de confirmation intégrée -->
+<div id="modal-overlay" class="modal-overlay">
+    <div class="modal-box">
+        <div id="modal-message" class="modal-message"></div>
+        <div class="modal-actions">
+            <button id="modal-cancel" class="modal-btn modal-btn-cancel">Annuler</button>
+            <button id="modal-confirm" class="modal-btn modal-btn-confirm">Confirmer</button>
+        </div>
+    </div>
+</div>
+
 <script>
     // Chargement initial des données stockées sur l'iPhone
     let config = JSON.parse(localStorage.getItem('deployer_config')) || { user: '', token: '' };
@@ -214,7 +268,47 @@
         box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
-    function sauvegarderConfig() {
+    // Fenêtre de confirmation intégrée : renvoie une promesse (true = confirmé).
+    // On retire d'abord le focus du champ actif pour faire disparaître le
+    // clavier, puis on laisse un court instant à l'animation avant d'afficher
+    // la fenêtre bien centrée — plus jamais de boutons cachés par le clavier.
+    function confirmerModal(message, texteConfirmer, texteAnnuler) {
+        return new Promise((resolve) => {
+            if (document.activeElement && document.activeElement.blur) {
+                document.activeElement.blur();
+            }
+
+            const overlay = document.getElementById('modal-overlay');
+            const msg = document.getElementById('modal-message');
+            const btnConfirm = document.getElementById('modal-confirm');
+            const btnCancel = document.getElementById('modal-cancel');
+
+            msg.textContent = message;
+            btnConfirm.textContent = texteConfirmer || "Confirmer";
+            btnCancel.textContent = texteAnnuler || "Annuler";
+
+            function nettoyer() {
+                overlay.classList.remove('visible');
+                btnConfirm.removeEventListener('click', onConfirm);
+                btnCancel.removeEventListener('click', onCancel);
+                overlay.removeEventListener('click', onFond);
+            }
+            function onConfirm() { nettoyer(); resolve(true); }
+            function onCancel() { nettoyer(); resolve(false); }
+            // Toucher le fond sombre équivaut à annuler
+            function onFond(e) { if (e.target === overlay) { nettoyer(); resolve(false); } }
+
+            btnConfirm.addEventListener('click', onConfirm);
+            btnCancel.addEventListener('click', onCancel);
+            overlay.addEventListener('click', onFond);
+
+            // Petit délai : le temps que le clavier commence à se refermer,
+            // pour que la fenêtre s'affiche à sa place définitive.
+            setTimeout(() => overlay.classList.add('visible'), 120);
+        });
+    }
+
+    async function sauvegarderConfig() {
         const nouveauUser = document.getElementById('gh-user').value.trim();
         const nouveauToken = document.getElementById('gh-token').value.trim();
 
@@ -238,9 +332,11 @@
         const remplaceToken = config.token && config.token !== nouveauToken;
 
         if (remplaceUser || remplaceToken) {
-            const ok = confirm(
+            const ok = await confirmerModal(
                 "Tu vas REMPLACER les identifiants déjà enregistrés par de " +
-                "nouvelles valeurs.\n\nConfirmer le remplacement ?"
+                "nouvelles valeurs.\n\nConfirmer le remplacement ?",
+                "Remplacer",
+                "Annuler"
             );
             if (!ok) {
                 afficherMessage("Remplacement annulé. Tes identifiants précédents sont conservés.", "success");
@@ -745,7 +841,12 @@
     // Restaure une ancienne version : on crée un NOUVEAU commit avec l'ancien contenu.
     // L'historique reste intact, on ne perd donc jamais rien.
     async function restaurerVersion(repo, commitSha, dateStr) {
-        if (!confirm(`Restaurer la version du ${dateStr} ?\n\nLa version actuelle restera dans l'historique, tu pourras y revenir.`)) {
+        const okRestaurer = await confirmerModal(
+            `Restaurer la version du ${dateStr} ?\n\nLa version actuelle restera dans l'historique, tu pourras y revenir.`,
+            "Restaurer",
+            "Annuler"
+        );
+        if (!okRestaurer) {
             return;
         }
 
