@@ -110,6 +110,30 @@
         .btn-copy:active { background-color: #005bb5; }
         .btn-restore { background-color: #ff9500; color: white; }
         .btn-restore:active { background-color: #c93400; }
+
+        /* Styles de la liste des descriptifs */
+        .descriptif-item {
+            background: #f5f5f7;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        .descriptif-nom { font-weight: 600; color: #1d1d1f; margin-bottom: 6px; word-break: break-word; }
+        .descriptif-row { display: flex; align-items: center; gap: 10px; }
+        .descriptif-texte { flex: 1; color: #86868b; font-size: 13px; word-break: break-word; }
+        .btn-edit {
+            background-color: #0071e3;
+            color: white;
+            padding: 6px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .btn-edit:active { background-color: #005bb5; }
     </style>
 </head>
 <body>
@@ -127,6 +151,8 @@
         <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxx">
         <button class="btn" onclick="sauvegarderConfig()">Enregistrer les identifiants</button>
         <button class="btn" onclick="ouvrirDepotsGithub()" style="background-color: #6e6e73; margin-top: 10px;">📂 Voir mes dépôts GitHub</button>
+        <button class="btn" onclick="chargerDescriptifs()" style="background-color: #5856d6; margin-top: 10px;">📝 Liste des descriptifs</button>
+        <div id="descriptifs-list" style="margin-top: 15px;"></div>
     </div>
 
     <!-- 2. GESTION DES APPLICATIONS CIBLES -->
