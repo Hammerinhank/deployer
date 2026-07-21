@@ -208,6 +208,18 @@
         <label for="new-target-repo">Nom du dépôt sur GitHub</label>
         <input type="text" id="new-target-repo" placeholder="Ex: boussole">
         <button class="btn btn-secondary" onclick="ajouterCible()">Ajouter cette cible</button>
+
+        <hr style="border: 0; border-top: 1px solid #e5e5ea; margin: 22px 0;">
+        <h2 style="font-size: 16px;">➕ Créer un nouveau dépôt</h2>
+        <p style="font-size: 13px; color: #86868b; margin-top: 0;">
+            Crée un dépôt tout neuf, y ajoute une page de départ, active GitHub Pages
+            et l'enregistre automatiquement comme cible ci-dessus.
+        </p>
+        <label for="new-repo-name">Nom du dépôt (sur GitHub)</label>
+        <input type="text" id="new-repo-name" placeholder="Ex: ma-nouvelle-app">
+        <label for="new-repo-display">Nom d'affichage (optionnel)</label>
+        <input type="text" id="new-repo-display" placeholder="Ex: Ma Nouvelle App">
+        <button class="btn" id="btn-creer-depot" onclick="creerNouveauDepot()" style="background-color: #5856d6;">Créer le dépôt</button>
     </div>
 
     <!-- 3. ZONE DE DÉPLOIEMENT -->
@@ -598,6 +610,159 @@
         cibles.splice(index, 1);
         localStorage.setItem('deployer_cibles', JSON.stringify(cibles));
         rafraichirCiblesUI();
+    }
+
+    // Ajoute une cible sans créer de doublon, puis rafraîchit l'interface.
+    function ajouterCibleAutomatique(name, repo) {
+        const existe = cibles.some(c => c.repo === repo);
+        if (!existe) {
+            cibles.push({ name: name, repo: repo });
+            localStorage.setItem('deployer_cibles', JSON.stringify(cibles));
+            rafraichirCiblesUI();
+        }
+    }
+
+    // Crée un dépôt tout neuf, y met une page de départ, active GitHub Pages,
+    // puis l'enregistre automatiquement comme cible. Tout s'enchaîne en une action.
+    async function creerNouveauDepot() {
+        const repoSaisi = document.getElementById('new-repo-name').value.trim();
+        const affichageSaisi = document.getElementById('new-repo-display').value.trim();
+        const btn = document.getElementById('btn-creer-depot');
+
+        if (!verifierConfig()) return;
+        if (!repoSaisi) {
+            afficherMessage("Erreur : indique le nom du nouveau dépôt.", "error");
+            document.getElementById('new-repo-name').focus();
+            return;
+        }
+
+        const ok = await confirmerModal(
+            `Créer un nouveau dépôt nommé « ${repoSaisi} » sur ton compte GitHub ?\n\n` +
+            "Une page de départ sera ajoutée, GitHub Pages activé, et le dépôt " +
+            "enregistré comme cible.",
+            "Créer",
+            "Annuler"
+        );
+        if (!ok) return;
+
+        btn.disabled = true;
+
+        try {
+            // 1) Création du dépôt (auto_init crée un commit initial : la branche existe).
+            afficherMessage("Création du dépôt sur GitHub...", "success");
+            const repoResp = await fetch("https://api.github.com/user/repos", {
+                method: "POST",
+                headers: headersGitHub(),
+                body: JSON.stringify({
+                    name: repoSaisi,
+                    description: affichageSaisi || repoSaisi,
+                    auto_init: true,
+                    private: false
+                })
+            });
+
+            if (!repoResp.ok) {
+                const e = await repoResp.json();
+                let detail = e.message || repoResp.statusText;
+                if (e.errors && e.errors[0] && e.errors[0].message) detail += ` (${e.errors[0].message})`;
+                afficherMessage(`Impossible de créer le dépôt : ${detail}`, "error");
+                return;
+            }
+
+            const repoData = await repoResp.json();
+            const owner = repoData.owner.login;
+            const repoReel = repoData.name;              // Nom réellement retenu par GitHub
+            const affichage = affichageSaisi || repoReel;
+            const branche = repoData.default_branch || "main";
+
+            // 2) Page de départ index.html (sinon Pages n'a rien à servir).
+            afficherMessage("Ajout de la page de départ...", "success");
+            const echapper = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            const pageDepart =
+`<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${echapper(affichage)}</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background:#f5f5f7; color:#1d1d1f; text-align:center; padding:60px 20px; }
+  h1 { color:#0071e3; }
+  p { color:#86868b; }
+</style>
+</head>
+<body>
+<h1>${echapper(affichage)}</h1>
+<p>Nouvelle application créée avec Le Déployeur.</p>
+<p>Déploie ton code depuis l'étape 3 pour remplacer cette page.</p>
+</body>
+</html>`;
+
+            const putResp = await fetch(`https://api.github.com/repos/${owner}/${repoReel}/contents/index.html`, {
+                method: "PUT",
+                headers: headersGitHub(),
+                body: JSON.stringify({
+                    message: "Page de départ créée via Le Déployeur",
+                    content: encoderBase64(pageDepart),
+                    branch: branche
+                })
+            });
+
+            if (!putResp.ok) {
+                const e = await putResp.json();
+                // Le dépôt existe : on l'enregistre quand même comme cible.
+                ajouterCibleAutomatique(affichage, repoReel);
+                afficherMessage(
+                    `Dépôt « ${repoReel} » créé et enregistré comme cible, mais l'ajout ` +
+                    `de la page de départ a échoué : ${e.message || putResp.statusText}.`,
+                    "error"
+                );
+                return;
+            }
+
+            // 3) Activation de GitHub Pages (branche par défaut, dossier racine).
+            afficherMessage("Activation de GitHub Pages...", "success");
+            let urlPages = `https://${owner}.github.io/${repoReel}/`;
+            const pagesResp = await fetch(`https://api.github.com/repos/${owner}/${repoReel}/pages`, {
+                method: "POST",
+                headers: {
+                    "Authorization": `token ${config.token}`,
+                    "Accept": "application/vnd.github+json"
+                },
+                body: JSON.stringify({ source: { branch: branche, path: "/" } })
+            });
+
+            const pagesOk = pagesResp.ok || pagesResp.status === 409; // 409 = déjà activé
+            if (pagesResp.ok) {
+                try { const pd = await pagesResp.json(); if (pd.html_url) urlPages = pd.html_url; } catch (_) {}
+            }
+
+            // 4) Enregistrement comme cible + nettoyage des champs.
+            ajouterCibleAutomatique(affichage, repoReel);
+            document.getElementById('new-repo-name').value = "";
+            document.getElementById('new-repo-display').value = "";
+
+            if (pagesOk) {
+                afficherMessage(
+                    `✅ Dépôt « ${repoReel} » créé, page de départ ajoutée, Pages activé ` +
+                    `et cible enregistrée.\n\nAdresse : ${urlPages}\n\n` +
+                    "Le site peut mettre 1 à 2 minutes à apparaître la première fois.",
+                    "success"
+                );
+            } else {
+                const e = await pagesResp.json().catch(() => ({}));
+                afficherMessage(
+                    `Dépôt « ${repoReel} » créé, page de départ ajoutée et cible enregistrée.\n\n` +
+                    `⚠️ L'activation automatique de Pages a échoué : ${e.message || pagesResp.statusText}.\n` +
+                    `Tu peux l'activer à la main dans Settings > Pages du dépôt (branche ${branche}, dossier /).`,
+                    "error"
+                );
+            }
+        } catch (error) {
+            afficherMessage(`Erreur réseau : ${error.message}`, "error");
+        } finally {
+            btn.disabled = false;
+        }
     }
 
     // ---------- OUTILS COMMUNS ----------
