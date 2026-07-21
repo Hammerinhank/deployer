@@ -210,6 +210,8 @@
         box.style.display = 'block';
         box.className = 'status ' + type;
         box.textContent = texte;
+        // On amène le message à l'écran, sinon il reste invisible tout en bas de la page
+        box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
     function sauvegarderConfig() {
@@ -228,6 +230,165 @@
             return;
         }
         window.open(`https://github.com/${user}?tab=repositories`, '_blank');
+    }
+
+    // ---------- LISTE & ÉDITION DES DESCRIPTIFS ----------
+
+    // Récupère tous les dépôts du compte et affiche leur descriptif
+    async function chargerDescriptifs() {
+        const listDiv = document.getElementById('descriptifs-list');
+
+        // IMPORTANT : tout le retour (chargement / erreur / résultat) s'affiche ICI,
+        // juste sous le bouton, et PAS dans la zone de statut tout en bas de la page.
+        if(!config.user || !config.token) {
+            listDiv.innerHTML = "<p style='color:#c62828; font-size:14px; font-weight:600;'>⛔ Renseigne d'abord ton nom d'utilisateur et ton token à l'étape 1.</p>";
+            listDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            return;
+        }
+
+        listDiv.innerHTML = "<p style='color:#86868b; font-size:14px;'>Chargement des dépôts…</p>";
+        listDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+        try {
+            // On récupère tous les dépôts dont on est propriétaire (avec pagination)
+            let repos = [];
+            let page = 1;
+            const parPage = 100;
+            while (true) {
+                const url = `https://api.github.com/user/repos?per_page=${parPage}&page=${page}&affiliation=owner&sort=full_name`;
+                const reponse = await fetch(url, { headers: headersGitHub() });
+                if (!reponse.ok) {
+                    let detail = `${reponse.status} ${reponse.statusText}`;
+                    try { const e = await reponse.json(); if (e && e.message) detail = e.message; } catch (_) {}
+                    listDiv.innerHTML =
+                        `<p style='color:#c62828; font-size:14px; font-weight:600; margin-top:0;'>Erreur GitHub : ${detail}</p>` +
+                        `<p style='color:#86868b; font-size:13px;'>Vérifie que ton token est valide et possède la portée <strong>repo</strong> (token classique) ou la permission <strong>Metadata + Administration</strong> en écriture (token fine-grained).</p>`;
+                    return;
+                }
+                const lot = await reponse.json();
+                repos = repos.concat(lot);
+                if (lot.length < parPage) break; // Dernière page atteinte
+                page++;
+                if (page > 10) break; // Sécurité (1000 dépôts max)
+            }
+
+            if (repos.length === 0) {
+                listDiv.innerHTML = "<p style='color:#86868b; font-size:14px;'>Aucun dépôt trouvé.</p>";
+                return;
+            }
+
+            listDiv.innerHTML =
+                `<p style='color:#2e7d32; font-size:13px; font-weight:600; margin-top:0;'>${repos.length} dépôt(s) chargé(s) — clique sur « Edit » pour modifier un descriptif.</p>`;
+            repos.forEach(repo => {
+                const item = document.createElement('div');
+                item.className = 'descriptif-item';
+                afficherDescriptifLecture(item, repo.name, repo.description);
+                listDiv.appendChild(item);
+            });
+        } catch (error) {
+            listDiv.innerHTML = `<p style='color:#c62828; font-size:14px; font-weight:600;'>Erreur réseau : ${error.message}</p>`;
+        }
+    }
+
+    // Affiche un dépôt en mode lecture (descriptif + bouton Edit)
+    function afficherDescriptifLecture(item, repoName, description) {
+        item.innerHTML = "";
+
+        const nom = document.createElement('div');
+        nom.className = 'descriptif-nom';
+        nom.textContent = repoName;
+
+        const row = document.createElement('div');
+        row.className = 'descriptif-row';
+
+        const desc = document.createElement('div');
+        desc.className = 'descriptif-texte';
+        if (description && description.trim()) {
+            desc.textContent = description;
+        } else {
+            desc.innerHTML = "<em style='color:#c7c7cc;'>(descriptif vide — clique sur Edit pour en ajouter un)</em>";
+        }
+
+        const btnEdit = document.createElement('button');
+        btnEdit.className = 'btn-edit';
+        btnEdit.textContent = "Edit";
+        btnEdit.addEventListener('click', () => afficherDescriptifEdition(item, repoName, description || ""));
+
+        row.appendChild(desc);
+        row.appendChild(btnEdit);
+        item.appendChild(nom);
+        item.appendChild(row);
+    }
+
+    // Affiche un dépôt en mode édition (champ de saisie + Enregistrer / Annuler)
+    function afficherDescriptifEdition(item, repoName, descriptionActuelle) {
+        item.innerHTML = "";
+
+        const nom = document.createElement('div');
+        nom.className = 'descriptif-nom';
+        nom.textContent = repoName;
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = descriptionActuelle;
+        input.placeholder = "Descriptif du dépôt";
+        input.style.marginBottom = '8px';
+
+        const actions = document.createElement('div');
+        actions.style.display = 'flex';
+        actions.style.gap = '8px';
+
+        const btnSave = document.createElement('button');
+        btnSave.className = 'btn-small btn-copy';
+        btnSave.textContent = "Enregistrer";
+
+        const btnCancel = document.createElement('button');
+        btnCancel.className = 'btn-small btn-view';
+        btnCancel.textContent = "Annuler";
+        btnCancel.addEventListener('click', () => afficherDescriptifLecture(item, repoName, descriptionActuelle));
+
+        btnSave.addEventListener('click', async () => {
+            const nouveau = input.value.trim();
+            btnSave.disabled = true;
+            btnCancel.disabled = true;
+            const ok = await enregistrerDescriptif(repoName, nouveau);
+            if (ok) {
+                afficherDescriptifLecture(item, repoName, nouveau);
+            } else {
+                btnSave.disabled = false;
+                btnCancel.disabled = false;
+            }
+        });
+
+        actions.appendChild(btnSave);
+        actions.appendChild(btnCancel);
+        item.appendChild(nom);
+        item.appendChild(input);
+        item.appendChild(actions);
+        input.focus();
+    }
+
+    // Envoie le nouveau descriptif à GitHub (PATCH sur le dépôt)
+    async function enregistrerDescriptif(repoName, description) {
+        try {
+            const url = `https://api.github.com/repos/${config.user}/${repoName}`;
+            const reponse = await fetch(url, {
+                method: "PATCH",
+                headers: headersGitHub(),
+                body: JSON.stringify({ description: description })
+            });
+            if (reponse.ok) {
+                afficherMessage(`Descriptif de "${repoName}" mis à jour.`, "success");
+                return true;
+            } else {
+                const errData = await reponse.json();
+                afficherMessage(`Échec de la mise à jour de "${repoName}" : ${errData.message || reponse.statusText}`, "error");
+                return false;
+            }
+        } catch (error) {
+            afficherMessage(`Erreur réseau : ${error.message}`, "error");
+            return false;
+        }
     }
 
     function rafraichirCiblesUI() {
