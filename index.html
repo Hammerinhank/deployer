@@ -419,7 +419,33 @@
                 s.appendChild(opt);
             });
         });
+
+        // Après avoir (re)construit les options, on réaligne les deux menus
+        // pour qu'ils pointent sur la même application.
+        synchroniserSelects();
     }
+
+    // Garde les deux menus déroulants (déploiement + historique) sur la même
+    // application. Quand on change l'un, l'autre suit automatiquement, et
+    // inversement.
+    function synchroniserSelects(source) {
+        const select = document.getElementById('select-target');
+        const selectHistory = document.getElementById('select-history-target');
+
+        if (source === 'deploiement') {
+            selectHistory.value = select.value;
+        } else if (source === 'historique') {
+            select.value = selectHistory.value;
+        } else {
+            // Appel initial (au chargement) : on aligne l'historique sur le déploiement.
+            selectHistory.value = select.value;
+        }
+    }
+
+    document.getElementById('select-target')
+        .addEventListener('change', () => synchroniserSelects('deploiement'));
+    document.getElementById('select-history-target')
+        .addEventListener('change', () => synchroniserSelects('historique'));
 
     function ajouterCible() {
         const name = document.getElementById('new-target-name').value.trim();
