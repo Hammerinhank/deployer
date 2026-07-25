@@ -794,6 +794,30 @@
         return true;
     }
 
+    // Cherche les fichiers dont le nom ne diffère QUE par la casse (ex :
+    // « index.html » ET « Index.html »). GitHub les considère comme deux
+    // fichiers distincts, mais l'API Contents et GitHub Pages peuvent les
+    // confondre : c'est la cause typique d'un déploiement "réussi" (un commit
+    // est bien créé) qui pourtant ne change RIEN à l'écran, parce que l'écriture
+    // atterrit sur le mauvais fichier.
+    // Renvoie la liste des noms trouvés (ex : ["Index.html", "index.html"])
+    // ou null si la vérification n'a pas pu être faite.
+    async function detecterDoublonsCasse(repo, nomFichier) {
+        try {
+            const url = `https://api.github.com/repos/${config.user}/${repo}/contents/`;
+            const rep = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
+            if (!rep.ok) return null;
+            const fichiers = await rep.json();
+            if (!Array.isArray(fichiers)) return null;
+            const cible = nomFichier.toLowerCase();
+            return fichiers
+                .filter(f => f.type === 'file' && f.name.toLowerCase() === cible)
+                .map(f => f.name);
+        } catch (_) {
+            return null;
+        }
+    }
+
     // ---------- DÉPLOIEMENT ----------
 
     async function deployerCode() {
@@ -859,13 +883,110 @@
                 body: JSON.stringify(bodyPayload)
             });
 
-            if (reponsePut.ok) {
-                afficherMessage("Félicitations ! Le code a été poussé sur GitHub.\nVotre application sera mise à jour sur votre iPhone d'ici 30 à 60 secondes.", "success");
-                document.getElementById('html-code').value = ""; // On vide la zone après succès
-                document.getElementById('commit-comment').value = ""; // On vide aussi le commentaire
-            } else {
-                const errData = await reponsePut.json();
+            // Cas 1 : l'API refuse carrément l'écriture. Message d'erreur clair, on s'arrête.
+            if (!reponsePut.ok) {
+                const errData = await reponsePut.json().catch(() => ({}));
                 afficherMessage(`Échec du déploiement : ${errData.message || reponsePut.statusText}`, "error");
+                return;
+            }
+
+            // À partir d'ici, le PUT a réussi : un commit A ÉTÉ créé.
+            // MAIS "commit créé" ne veut PAS dire "la bonne page a changé".
+            // C'est exactement le piège qui t'a joué des tours : succès annoncé,
+            // aucun changement à l'écran. On vérifie donc TOUT avant de fêter ça.
+            const resultat = await reponsePut.json();
+            const shaCommit = (resultat.commit && resultat.commit.sha)
+                ? resultat.commit.sha.substring(0, 7) : "inconnu";
+            const cheminEcrit = (resultat.content && resultat.content.path)
+                ? resultat.content.path : "index.html";
+
+            // ---- VÉRIFICATION 1 : GitHub a-t-il écrit dans le BON fichier ? ----
+            // On a demandé « index.html ». Si GitHub répond avoir écrit dans
+            // « Index.html » (ou tout autre nom), c'est le piège de la casse :
+            // la page réellement affichée ne changera pas.
+            if (cheminEcrit !== "index.html") {
+                afficherMessage(
+                    "⚠️ FAUX SUCCÈS DÉTECTÉ\n\n" +
+                    `Le commit ${shaCommit} a bien été créé, MAIS GitHub dit avoir écrit ` +
+                    `dans « ${cheminEcrit} », et non dans « index.html ».\n\n` +
+                    "C'est très probablement pour ça que ton appli ne changeait pas : la " +
+                    "page réellement affichée est « index.html » (minuscule), pas celle-ci.\n\n" +
+                    "➡️ Va dans le dépôt sur GitHub et SUPPRIME le fichier en double " +
+                    "(celui qui ne diffère que par une majuscule).\n\n" +
+                    "Ton code n'a pas été perdu, il est toujours dans la zone ci-dessus.",
+                    "error"
+                );
+                return;
+            }
+
+            // ---- VÉRIFICATION 2 : relecture + comparaison caractère par caractère ----
+            // On relit le fichier réellement en ligne et on compare, exactement,
+            // avec ce que tu viens d'envoyer. C'est LA preuve que ça a marché.
+            afficherMessage(`Commit ${shaCommit} créé. Vérification du contenu réellement en ligne...`, "success");
+
+            let verifOk = false;
+            let detailVerif = "";
+            try {
+                const relecture = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
+                if (relecture.ok) {
+                    const donneesRelues = await relecture.json();
+                    const contenuEnLigne = decoderBase64(donneesRelues.content);
+                    if (contenuEnLigne === code) {
+                        verifOk = true;
+                    } else {
+                        detailVerif =
+                            `Le contenu en ligne fait ${contenuEnLigne.length} caractères, ` +
+                            `alors que tu en as envoyé ${code.length}. Ils ne correspondent pas.`;
+                    }
+                } else {
+                    detailVerif = `Relecture impossible (${relecture.status} ${relecture.statusText}).`;
+                }
+            } catch (e) {
+                detailVerif = "Relecture impossible : " + e.message;
+            }
+
+            // ---- VÉRIFICATION 3 : reste-t-il des fichiers en double (casse) ? ----
+            // Même si l'écriture a réussi cette fois, un doublon qui traîne fera
+            // rater un prochain déploiement. On prévient tant qu'il existe.
+            const doublons = await detecterDoublonsCasse(repo, "index.html");
+            const aDoublons = Array.isArray(doublons) && doublons.length > 1;
+
+            // ---- Verdict final ----
+            if (verifOk && !aDoublons) {
+                afficherMessage(
+                    "✅ Déploiement VÉRIFIÉ !\n\n" +
+                    `Commit ${shaCommit} — le contenu en ligne correspond exactement à ce ` +
+                    "que tu as envoyé.\n\n" +
+                    "Ton application sera à jour sur ton iPhone d'ici 30 à 60 secondes.",
+                    "success"
+                );
+                // Tout est propre : on peut vider les champs sans risque.
+                document.getElementById('html-code').value = "";
+                document.getElementById('commit-comment').value = "";
+            } else if (verifOk && aDoublons) {
+                afficherMessage(
+                    `✅ Le contenu a bien été mis à jour (commit ${shaCommit}).\n\n` +
+                    "⚠️ MAIS ton dépôt contient plusieurs fichiers qui ne diffèrent que par " +
+                    `la casse :\n\n   ${doublons.join("   ·   ")}\n\n` +
+                    "C'est un piège : un prochain déploiement risque d'écrire dans le mauvais " +
+                    "et de ne rien changer à l'écran (c'est exactement ce qui s'est passé " +
+                    "l'autre fois). Supprime le(s) doublon(s) sur GitHub pour être tranquille.\n\n" +
+                    "Par précaution, ton code n'a PAS été effacé de la zone ci-dessus.",
+                    "error"
+                );
+                // On ne vide pas les champs : on veut que tu règles le doublon d'abord.
+            } else {
+                afficherMessage(
+                    "⚠️ FAUX SUCCÈS POSSIBLE\n\n" +
+                    `Le commit ${shaCommit} a été créé, mais la vérification du contenu réellement ` +
+                    "en ligne a échoué :\n\n" + detailVerif + "\n\n" +
+                    (aDoublons
+                        ? `Il y a aussi des fichiers en double : ${doublons.join(", ")}. C'est très probablement la cause.\n\n`
+                        : "") +
+                    "Ne considère PAS cette version comme déployée. Ton code reste dans la zone " +
+                    "ci-dessus, tu ne l'as pas perdu.",
+                    "error"
+                );
             }
         } catch (error) {
             afficherMessage(`Erreur réseau : ${error.message}`, "error");
@@ -1040,12 +1161,62 @@
                 })
             });
 
-            if (reponsePut.ok) {
-                afficherMessage(`Version du ${dateStr} restaurée !\nVotre application sera mise à jour d'ici 30 à 60 secondes.`, "success");
-                chargerHistorique(); // On rafraîchit la liste pour voir le nouveau commit de restauration
-            } else {
+            if (!reponsePut.ok) {
                 const errData = await reponsePut.json();
                 afficherMessage(`Échec de la restauration : ${errData.message || reponsePut.statusText}`, "error");
+                return;
+            }
+
+            // Même logique de vérification que pour un déploiement : on confirme
+            // que le fichier réellement en ligne = l'ancien contenu qu'on restaure.
+            const resultat = await reponsePut.json();
+            const shaCommit = (resultat.commit && resultat.commit.sha)
+                ? resultat.commit.sha.substring(0, 7) : "inconnu";
+            const cheminEcrit = (resultat.content && resultat.content.path)
+                ? resultat.content.path : "index.html";
+
+            if (cheminEcrit !== "index.html") {
+                afficherMessage(
+                    "⚠️ FAUX SUCCÈS DÉTECTÉ pendant la restauration\n\n" +
+                    `Le commit ${shaCommit} a été créé, mais GitHub a écrit dans ` +
+                    `« ${cheminEcrit} » et non « index.html ». Supprime le fichier en ` +
+                    "double (majuscule) sur le dépôt.",
+                    "error"
+                );
+                return;
+            }
+
+            let verifOk = false;
+            let detailVerif = "";
+            try {
+                const relecture = await fetch(urlActuel, { headers: headersGitHub(), cache: "no-store" });
+                if (relecture.ok) {
+                    const relues = await relecture.json();
+                    if (decoderBase64(relues.content) === ancienContenu) {
+                        verifOk = true;
+                    } else {
+                        detailVerif = "Le contenu en ligne ne correspond pas à la version restaurée.";
+                    }
+                } else {
+                    detailVerif = `Relecture impossible (${relecture.status}).`;
+                }
+            } catch (e) {
+                detailVerif = "Relecture impossible : " + e.message;
+            }
+
+            if (verifOk) {
+                afficherMessage(
+                    `✅ Version du ${dateStr} restaurée et VÉRIFIÉE (commit ${shaCommit}).\n` +
+                    "Ton application sera à jour d'ici 30 à 60 secondes.",
+                    "success"
+                );
+                chargerHistorique(); // On rafraîchit la liste pour voir le nouveau commit de restauration
+            } else {
+                afficherMessage(
+                    `⚠️ Le commit de restauration ${shaCommit} a été créé, mais la vérification ` +
+                    "a échoué :\n\n" + detailVerif + "\n\nVérifie l'état du dépôt avant de continuer.",
+                    "error"
+                );
             }
         } catch (error) {
             afficherMessage(`Erreur pendant la restauration : ${error.message}`, "error");
