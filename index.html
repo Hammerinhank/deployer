@@ -854,15 +854,37 @@
         const url = `https://api.github.com/repos/${config.user}/${repo}/contents/index.html`;
         let sha = null;
 
-        // Étape A : On cherche si index.html existe déjà pour obtenir son identifiant unique (SHA)
+        // Étape A : On lit index.html en ligne pour récupérer son identifiant (SHA)
+        // ET son contenu actuel. Lecture SANS cache, pour comparer avec l'état réel.
+        let contenuActuel = null;
         try {
-            const reponseCheck = await fetch(url, { headers: headersGitHub() });
+            const reponseCheck = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
             if (reponseCheck.ok) {
                 const donneesFile = await reponseCheck.json();
                 sha = donneesFile.sha;
+                try { contenuActuel = decoderBase64(donneesFile.content); } catch (_) { contenuActuel = null; }
             }
         } catch (err) {
             console.log("Nouveau fichier ou erreur de lecture", err);
+        }
+
+        // Étape A bis : test anti-doublon. Si le code à envoyer est RIGOUREUSEMENT
+        // identique à ce qui est déjà en ligne, l'API Contents de GitHub ne crée
+        // AUCUN nouveau commit : elle répond "OK" sans rien changer. On te le dit
+        // franchement, au lieu d'un faux succès, et on n'envoie rien.
+        if (contenuActuel !== null && contenuActuel === code) {
+            afficherMessage(
+                "ℹ️ RIEN À DÉPLOYER\n\n" +
+                "Le code que tu veux envoyer est rigoureusement identique à la version " +
+                "déjà en ligne.\n\n" +
+                "GitHub ne créerait aucune nouvelle version (son API considère qu'il n'y " +
+                "a rien à changer). Aucun commit n'a donc été créé, et ton commentaire " +
+                "n'a pas été enregistré.\n\n" +
+                "Si tu voulais vraiment marquer une nouvelle version, modifie au moins un " +
+                "caractère du code avant de renvoyer.",
+                "error"
+            );
+            return;
         }
 
         // Étape B : Encodage propre du texte en Base64
