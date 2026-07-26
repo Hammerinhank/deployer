@@ -70,6 +70,18 @@
             border-radius: 6px;
             margin-bottom: 8px;
             font-size: 14px;
+            /* On coupe la sélection de texte et le menu contextuel iOS sur la
+               ligne : c'est ce qui empêchait de « saisir » l'item (Safari
+               démarrait sa loupe de sélection au lieu du glissement). */
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+        /* Le champ de saisie du mode édition doit, lui, rester sélectionnable. */
+        .target-item input {
+            -webkit-user-select: text;
+            user-select: text;
+            -webkit-touch-callout: default;
         }
         /* Ligne en cours de glissement : légèrement soulevée et surlignée */
         .target-item.dragging {
@@ -77,19 +89,30 @@
             background: #eaf3ff;
             box-shadow: 0 6px 18px rgba(0,0,0,0.18);
         }
+        /* Pendant un glissement, on interdit toute sélection ailleurs sur la page. */
+        body.drag-actif, body.drag-actif * {
+            -webkit-user-select: none !important;
+            user-select: none !important;
+        }
         /* Poignée « ⠿ » servant de prise pour réordonner (souris et doigt).
-           touch-action: none empêche la page de défiler quand on glisse la poignée. */
+           - touch-action: none empêche la page de défiler pendant le glissement ;
+           - le fond gris et la taille en font une prise facile à viser au doigt. */
         .drag-handle {
             flex-shrink: 0;
             cursor: grab;
-            color: #b0b0b5;
-            font-size: 20px;
+            color: #6e6e73;
+            font-size: 22px;
             line-height: 1;
-            padding: 4px;
+            padding: 8px 10px;
+            margin: -2px 0;
+            border-radius: 6px;
+            background: #e5e5ea;
+            -webkit-user-select: none;
             user-select: none;
+            -webkit-touch-callout: none;
             touch-action: none;
         }
-        .drag-handle:active { cursor: grabbing; color: #6e6e73; }
+        .drag-handle:active { cursor: grabbing; background: #d1d1d6; }
         .target-info { flex: 1; min-width: 0; word-break: break-word; }
         .target-nom { color: #0071e3; text-decoration: none; font-weight: 600; }
         .target-repo { display: block; color: #86868b; font-size: 12px; margin-top: 2px; }
@@ -688,66 +711,99 @@
     }
 
     // ---------- RÉORDONNANCEMENT PAR GLISSEMENT (drag & drop) ----------
-    // Fonctionne à la souris ET au doigt grâce aux Pointer Events : c'est donc
-    // directement utilisable sur iPhone. On maintient la poignée « ⠿ » d'une
-    // ligne et on la glisse vers le haut ou le bas ; l'ordre est enregistré
-    // dans localStorage au relâchement.
+    // On maintient la poignée « ⠿ » d'une ligne et on la glisse vers le haut ou
+    // le bas ; l'ordre est enregistré dans localStorage au relâchement.
+    //
+    // Choix technique important : on utilise ici les ÉVÉNEMENTS TACTILES natifs
+    // (touchstart/touchmove/touchend) pour le doigt, et les événements souris
+    // pour l'iMac — et NON les Pointer Events. Sur iPhone, les Pointer Events +
+    // setPointerCapture sont capricieux, et surtout Safari lançait sa propre
+    // sélection de texte (la loupe) avant qu'on puisse « saisir » la ligne.
+    // Avec les événements tactiles, un preventDefault() dès le touchstart coupe
+    // net cette sélection et le défilement, et les touchmove suivants sont
+    // toujours livrés à la poignée où le geste a commencé, même si le doigt
+    // s'en éloigne. C'est la méthode la plus fiable sur iOS.
     function activerDragCible(handle, item) {
-        handle.addEventListener('pointerdown', (e) => {
-            // On ne réagit qu'au bouton principal / au toucher (pas au clic droit).
-            if (e.button && e.button !== 0) return;
-            e.preventDefault();
+        // Début du glissement : on soulève la ligne et on neutralise sa capture
+        // du pointeur, pour que elementFromPoint voie la ligne SOUS le doigt.
+        function debut() {
+            item.classList.add('dragging');
+            item.style.pointerEvents = 'none';
+            document.body.classList.add('drag-actif');
+        }
+
+        // Déplacement : on trouve la ligne sous le doigt/curseur et on réinsère
+        // la ligne glissée avant ou après, selon qu'on dépasse son milieu.
+        function deplacer(clientX, clientY) {
+            const listDiv = document.getElementById('target-list');
+            const sous = document.elementFromPoint(clientX, clientY);
+            if (!sous) return;
+            const ligne = sous.closest('.target-item');
+            if (!ligne || ligne === item || ligne.parentElement !== listDiv) return;
+            const rect = ligne.getBoundingClientRect();
+            const avant = clientY < rect.top + rect.height / 2;
+            listDiv.insertBefore(item, avant ? ligne : ligne.nextSibling);
+        }
+
+        // Fin du glissement : on repose la ligne, on recalcule l'ordre du
+        // tableau à partir de l'ordre affiché (via l'index d'origine mémorisé
+        // sur chaque ligne), on enregistre, puis on redessine tout au propre.
+        function fin() {
+            item.classList.remove('dragging');
+            item.style.pointerEvents = '';
+            document.body.classList.remove('drag-actif');
 
             const listDiv = document.getElementById('target-list');
-            item.classList.add('dragging');
-            // On rend la ligne « transparente » au pointeur pour que
-            // elementFromPoint voie la ligne située SOUS le doigt, pas elle-même.
-            item.style.pointerEvents = 'none';
+            const nouvelOrdre = [...listDiv.querySelectorAll('.target-item')]
+                .map(el => cibles[parseInt(el.dataset.index, 10)])
+                .filter(Boolean);
 
-            // La poignée capte tous les mouvements jusqu'au relâchement, même si
-            // le doigt sort de la poignée.
-            try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+            if (nouvelOrdre.length === cibles.length) {
+                cibles = nouvelOrdre;
+                localStorage.setItem('deployer_cibles', JSON.stringify(cibles));
+            }
+            rafraichirCiblesUI();
+        }
+
+        // ----- DOIGT (iPhone) : événements tactiles, non passifs -----
+        handle.addEventListener('touchstart', (e) => {
+            if (e.touches.length !== 1) return; // On ignore le multi-touch
+            e.preventDefault();                 // Coupe sélection + défilement
+            debut();
 
             function onMove(ev) {
-                const sous = document.elementFromPoint(ev.clientX, ev.clientY);
-                if (!sous) return;
-                const ligne = sous.closest('.target-item');
-                if (!ligne || ligne === item || ligne.parentElement !== listDiv) return;
-
-                // On insère la ligne glissée avant ou après la ligne survolée
-                // selon qu'on est au-dessus ou en dessous de son milieu.
-                const rect = ligne.getBoundingClientRect();
-                const avant = ev.clientY < rect.top + rect.height / 2;
-                listDiv.insertBefore(item, avant ? ligne : ligne.nextSibling);
+                ev.preventDefault();
+                const t = ev.touches[0];
+                deplacer(t.clientX, t.clientY);
             }
+            function onEnd() {
+                handle.removeEventListener('touchmove', onMove);
+                handle.removeEventListener('touchend', onEnd);
+                handle.removeEventListener('touchcancel', onEnd);
+                fin();
+            }
+            // Les touchmove restent livrés à la poignée pour toute la durée du
+            // geste, où que parte le doigt. { passive: false } autorise le
+            // preventDefault qui bloque le défilement de la page.
+            handle.addEventListener('touchmove', onMove, { passive: false });
+            handle.addEventListener('touchend', onEnd);
+            handle.addEventListener('touchcancel', onEnd);
+        }, { passive: false });
 
+        // ----- SOURIS (iMac) -----
+        handle.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return; // Bouton principal uniquement
+            e.preventDefault();
+            debut();
+
+            function onMove(ev) { deplacer(ev.clientX, ev.clientY); }
             function onUp() {
-                handle.removeEventListener('pointermove', onMove);
-                handle.removeEventListener('pointerup', onUp);
-                handle.removeEventListener('pointercancel', onUp);
-                try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
-
-                item.classList.remove('dragging');
-                item.style.pointerEvents = '';
-
-                // On reconstruit le tableau des cibles d'après l'ordre affiché,
-                // en s'appuyant sur l'index d'origine mémorisé sur chaque ligne.
-                const nouvelOrdre = [...listDiv.querySelectorAll('.target-item')]
-                    .map(el => cibles[parseInt(el.dataset.index, 10)])
-                    .filter(Boolean);
-
-                if (nouvelOrdre.length === cibles.length) {
-                    cibles = nouvelOrdre;
-                    localStorage.setItem('deployer_cibles', JSON.stringify(cibles));
-                }
-                // On redessine tout : indices, menus déroulants et écouteurs
-                // repartent ainsi d'un état propre.
-                rafraichirCiblesUI();
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+                fin();
             }
-
-            handle.addEventListener('pointermove', onMove);
-            handle.addEventListener('pointerup', onUp);
-            handle.addEventListener('pointercancel', onUp);
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
         });
     }
 
