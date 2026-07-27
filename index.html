@@ -342,7 +342,7 @@
         <label for="select-history-target">Application concernée</label>
         <select id="select-history-target"></select>
 
-        <button class="btn" onclick="copierUrlAppli()" style="background-color: #34c759;">🔗 Copier l'URL de l'appli</button>
+        <button class="btn" onclick="copierUrlAppli(this)" style="background-color: #34c759;">🔗 Copier l'URL de l'appli</button>
         <button class="btn" id="btn-history" onclick="chargerHistorique()" style="background-color: #ff9500; margin-top: 10px;">Charger l'historique</button>
 
         <div id="history-list" style="margin-top: 15px;"></div>
@@ -1803,14 +1803,19 @@
         }
     }
 
-    // Copie le code HTML d'une version dans le presse-papier
+    // Copie le code HTML d'une version dans le presse-papier.
+    // Tout le retour se fait SUR LE BOUTON (« Copie… » pendant la récupération
+    // réseau, puis « Copié ✓ » 2 s), sans afficher le message du bas ni faire
+    // défiler la page — sauf en cas d'erreur.
     async function copierVersion(repo, commitSha, dateStr, bouton) {
+        const origine = bouton ? bouton.textContent : null;
         try {
-            afficherMessage(`Récupération de la version du ${dateStr}...`, "success");
+            if (bouton) bouton.textContent = "Copie…"; // récupération en cours
             const contenu = await recupererContenuVersion(repo, commitSha);
 
             const ok = await copierTexte(contenu);
             if (!ok) {
+                if (bouton) bouton.textContent = origine;
                 afficherMessage(
                     `La copie automatique a échoué. Ouvre plutôt la version avec « Voir » puis ` +
                     `copie le code à la main (version du ${dateStr}).`,
@@ -1819,22 +1824,36 @@
                 return;
             }
 
-            // Retour visuel sur le bouton lui-même
+            // Succès : « Copié ✓ » pendant 2 s sur le bouton, rien en bas d'écran.
             if (bouton) {
-                const texteOrigine = bouton.textContent;
                 bouton.textContent = "Copié ✓";
-                setTimeout(() => { bouton.textContent = texteOrigine; }, 1500);
+                setTimeout(() => { bouton.textContent = origine; }, 2000);
             }
-            afficherMessage(`Code de la version du ${dateStr} copié dans le presse-papier.`, "success");
         } catch (error) {
+            if (bouton) bouton.textContent = origine; // on restaure le libellé
             afficherMessage(`Impossible de copier cette version : ${error.message}`, "error");
         }
+    }
+
+    // Affiche brièvement un texte sur un bouton (ex. « Copié ✓ »), puis restaure
+    // son libellé d'origine. Sert de retour visuel discret, SANS faire défiler
+    // la page vers le message de statut du bas.
+    function feedbackBouton(bouton, texte, ms) {
+        if (!bouton) return;
+        if (bouton.dataset.enCours === '1') return; // Évite les chevauchements
+        const origine = bouton.textContent;
+        bouton.dataset.enCours = '1';
+        bouton.textContent = texte;
+        setTimeout(() => {
+            bouton.textContent = origine;
+            bouton.dataset.enCours = '0';
+        }, ms || 2000);
     }
 
     // Copie l'URL GitHub Pages de l'application sélectionnée à l'étape 4.
     // Cette URL (https://<user>.github.io/<repo>/) sert TOUJOURS la dernière
     // version déployée : pas de numéro de commit, donc toujours à jour.
-    async function copierUrlAppli() {
+    async function copierUrlAppli(bouton) {
         if (!verifierConfig()) return;
         const repo = document.getElementById('select-history-target').value;
         if (!repo) {
@@ -1846,13 +1865,11 @@
 
         const ok = await copierTexte(url);
         if (ok) {
-            afficherMessage(
-                `🔗 URL copiée dans le presse-papier :\n${url}\n\n` +
-                "Elle ouvrira toujours la dernière version déployée de l'appli.",
-                "success"
-            );
+            // Succès : simple retour « Copié ✓ » sur le bouton pendant 2 s.
+            // On n'affiche PAS le message du bas et on ne fait donc pas défiler.
+            feedbackBouton(bouton, "Copié ✓", 2000);
         } else {
-            // Même si la copie échoue, on affiche l'URL pour un copier-coller manuel.
+            // Échec seulement : on affiche l'URL en bas pour un copier-coller manuel.
             afficherMessage(
                 "Le presse-papier n'a pas pu être utilisé sur cet appareil.\n\n" +
                 "Voici l'URL à copier à la main (elle ouvre toujours la dernière version) :\n\n" +
