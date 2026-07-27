@@ -24,6 +24,28 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
         h2 { font-size: 18px; margin-top: 0; color: #0071e3; }
+
+        /* Sections repliables (cartes 1 et 2) : le titre <summary> ouvre/ferme.
+           On masque le triangle natif et on affiche notre propre chevron. */
+        .section-repliable > summary {
+            list-style: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .section-repliable > summary::-webkit-details-marker { display: none; }
+        .section-repliable > summary::before {
+            content: "\25B8"; /* ▸ */
+            color: #0071e3;
+            font-size: 15px;
+            transition: transform 0.15s ease;
+            flex-shrink: 0;
+        }
+        .section-repliable[open] > summary::before { transform: rotate(90deg); }
+        .section-repliable > summary h2 { margin: 0; }
+        .section-contenu { margin-top: 15px; }
         label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; color: #86868b; }
         input, select, textarea {
             width: 100%;
@@ -243,52 +265,60 @@
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
-        <h2>1. Connexion GitHub</h2>
-        <label for="gh-user">Nom d'utilisateur GitHub</label>
-        <input type="text" id="gh-user" placeholder="Ex: henritavernier">
-        
-        <label for="gh-token">Token d'accès personnel (PAT)</label>
-        <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxx">
-        <button class="btn" onclick="window.open('https://github.com/settings/tokens', '_blank')" style="background-color: #6e6e73;">🔑 Tokens classiques</button>
-        <button class="btn" onclick="window.open('https://github.com/settings/tokens?type=beta', '_blank')" style="background-color: #6e6e73; margin-top: 10px;">🔑 Tokens fine-grained</button>
-        <button class="btn" onclick="sauvegarderConfig()" style="margin-top: 10px;">Enregistrer les identifiants</button>
-        <button class="btn" onclick="ouvrirDepotsGithub()" style="background-color: #6e6e73; margin-top: 10px;">📂 Voir mes dépôts GitHub</button>
-        <button class="btn" onclick="chargerDescriptifs()" style="background-color: #5856d6; margin-top: 10px;">📝 Liste des descriptifs</button>
-        <div id="descriptifs-list" style="margin-top: 15px;"></div>
+        <details class="section-repliable">
+            <summary><h2>1. Connexion GitHub</h2></summary>
+            <div class="section-contenu">
+                <label for="gh-user">Nom d'utilisateur GitHub</label>
+                <input type="text" id="gh-user" placeholder="Ex: henritavernier">
+                
+                <label for="gh-token">Token d'accès personnel (PAT)</label>
+                <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxx">
+                <button class="btn" onclick="window.open('https://github.com/settings/tokens', '_blank')" style="background-color: #6e6e73;">🔑 Tokens classiques</button>
+                <button class="btn" onclick="window.open('https://github.com/settings/tokens?type=beta', '_blank')" style="background-color: #6e6e73; margin-top: 10px;">🔑 Tokens fine-grained</button>
+                <button class="btn" onclick="sauvegarderConfig()" style="margin-top: 10px;">Enregistrer les identifiants</button>
+                <button class="btn" onclick="ouvrirDepotsGithub()" style="background-color: #6e6e73; margin-top: 10px;">📂 Voir mes dépôts GitHub</button>
+                <button class="btn" onclick="chargerDescriptifs()" style="background-color: #5856d6; margin-top: 10px;">📝 Liste des descriptifs</button>
+                <div id="descriptifs-list" style="margin-top: 15px;"></div>
+            </div>
+        </details>
     </div>
 
     <!-- 2. GESTION DES APPLICATIONS CIBLES -->
     <div class="card">
-        <h2>2. Gestion des Applications Cibles</h2>
-        <div id="target-list"></div>
-        <hr style="border: 0; border-top: 1px solid #e5e5ea; margin: 15px 0;">
-        <label for="new-target-name">Nom de l'application (Affichage)</label>
-        <input type="text" id="new-target-name" placeholder="Ex: Ma Super Boussole">
+        <details class="section-repliable">
+            <summary><h2>2. Gestion des Applications Cibles</h2></summary>
+            <div class="section-contenu">
+                <div id="target-list"></div>
+                <hr style="border: 0; border-top: 1px solid #e5e5ea; margin: 15px 0;">
+                <label for="new-target-name">Nom de l'application (Affichage)</label>
+                <input type="text" id="new-target-name" placeholder="Ex: Ma Super Boussole">
 
-        <label for="new-target-repo">Nom du dépôt sur GitHub</label>
-        <input type="text" id="new-target-repo" list="repos-datalist" placeholder="Tape le nom, ou choisis ci-dessous">
-        <!-- Suggestions en saisie libre (combo) alimentées depuis GitHub -->
-        <datalist id="repos-datalist"></datalist>
+                <label for="new-target-repo">Nom du dépôt sur GitHub</label>
+                <input type="text" id="new-target-repo" list="repos-datalist" placeholder="Tape le nom, ou choisis ci-dessous">
+                <!-- Suggestions en saisie libre (combo) alimentées depuis GitHub -->
+                <datalist id="repos-datalist"></datalist>
 
-        <label for="select-repo-existant">…ou choisir un dépôt existant</label>
-        <select id="select-repo-existant" onchange="choisirDepotExistant()">
-            <option value="">— aucun dépôt chargé —</option>
-        </select>
-        <button class="btn" id="btn-charger-depots" onclick="chargerListeDepots(false)" style="background-color: #6e6e73; margin-bottom: 15px;">🔄 Charger / rafraîchir la liste de mes dépôts</button>
+                <label for="select-repo-existant">…ou choisir un dépôt existant</label>
+                <select id="select-repo-existant" onchange="choisirDepotExistant()">
+                    <option value="">— aucun dépôt chargé —</option>
+                </select>
+                <button class="btn" id="btn-charger-depots" onclick="chargerListeDepots(false)" style="background-color: #6e6e73; margin-bottom: 15px;">🔄 Charger / rafraîchir la liste de mes dépôts</button>
 
-        <button class="btn btn-secondary" onclick="ajouterCible()">Ajouter cette cible</button>
+                <button class="btn btn-secondary" onclick="ajouterCible()">Ajouter cette cible</button>
 
-        <hr style="border: 0; border-top: 1px solid #e5e5ea; margin: 22px 0;">
-        <h2 style="font-size: 16px;">➕ Créer un nouveau dépôt</h2>
-        <p style="font-size: 13px; color: #86868b; margin-top: 0;">
-            Crée un dépôt tout neuf, y ajoute une page de départ, active GitHub Pages
-            et l'enregistre automatiquement comme cible ci-dessus.
-        </p>
-        <label for="new-repo-name">Nom du dépôt (sur GitHub)</label>
-        <input type="text" id="new-repo-name" placeholder="Ex: ma-nouvelle-app">
-        <label for="new-repo-display">Nom d'affichage (optionnel)</label>
-        <input type="text" id="new-repo-display" placeholder="Ex: Ma Nouvelle App">
-        <button class="btn" id="btn-creer-depot" onclick="creerNouveauDepot()" style="background-color: #5856d6;">Créer le dépôt</button>
+                <hr style="border: 0; border-top: 1px solid #e5e5ea; margin: 22px 0;">
+                <h2 style="font-size: 16px;">➕ Créer un nouveau dépôt</h2>
+                <p style="font-size: 13px; color: #86868b; margin-top: 0;">
+                    Crée un dépôt tout neuf, y ajoute une page de départ, active GitHub Pages
+                    et l'enregistre automatiquement comme cible ci-dessus.
+                </p>
+                <label for="new-repo-name">Nom du dépôt (sur GitHub)</label>
+                <input type="text" id="new-repo-name" placeholder="Ex: ma-nouvelle-app">
+                <label for="new-repo-display">Nom d'affichage (optionnel)</label>
+                <input type="text" id="new-repo-display" placeholder="Ex: Ma Nouvelle App">
+                <button class="btn" id="btn-creer-depot" onclick="creerNouveauDepot()" style="background-color: #5856d6;">Créer le dépôt</button>
+            </div>
+        </details>
     </div>
 
     <!-- 3. ZONE DE DÉPLOIEMENT -->
