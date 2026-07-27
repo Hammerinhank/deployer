@@ -1,0 +1,21 @@
+{
+  "cibles": [
+    {
+      "name": "Mon appli de test (parkings)",
+      "repo": "test-app"
+    },
+    {
+      "name": "Cette appli (de déploiement)",
+      "repo": "deployer"
+    },
+    {
+      "name": "Supprimer doublons",
+      "repo": "Supp-doublon"
+    },
+    {
+      "name": "Calcul de pente",
+      "repo": "app-pente"
+    }
+  ],
+  "maj": "2026-07-27T15:55:42.771Z"
+}
