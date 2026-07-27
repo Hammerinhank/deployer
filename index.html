@@ -264,8 +264,18 @@
         <hr style="border: 0; border-top: 1px solid #e5e5ea; margin: 15px 0;">
         <label for="new-target-name">Nom de l'application (Affichage)</label>
         <input type="text" id="new-target-name" placeholder="Ex: Ma Super Boussole">
+
         <label for="new-target-repo">Nom du dépôt sur GitHub</label>
-        <input type="text" id="new-target-repo" placeholder="Ex: boussole">
+        <input type="text" id="new-target-repo" list="repos-datalist" placeholder="Tape le nom, ou choisis ci-dessous">
+        <!-- Suggestions en saisie libre (combo) alimentées depuis GitHub -->
+        <datalist id="repos-datalist"></datalist>
+
+        <label for="select-repo-existant">…ou choisir un dépôt existant</label>
+        <select id="select-repo-existant" onchange="choisirDepotExistant()">
+            <option value="">— aucun dépôt chargé —</option>
+        </select>
+        <button class="btn" id="btn-charger-depots" onclick="chargerListeDepots(false)" style="background-color: #6e6e73; margin-bottom: 15px;">🔄 Charger / rafraîchir la liste de mes dépôts</button>
+
         <button class="btn btn-secondary" onclick="ajouterCible()">Ajouter cette cible</button>
 
         <hr style="border: 0; border-top: 1px solid #e5e5ea; margin: 22px 0;">
@@ -419,6 +429,9 @@
         config.token = nouveauToken;
         localStorage.setItem('deployer_config', JSON.stringify(config));
         afficherMessage("Identifiants enregistrés localement avec succès !", "success");
+        // Les identifiants sont valides : on remplit la combo des dépôts en
+        // arrière-plan (silencieux, pour ne pas masquer le message ci-dessus).
+        chargerListeDepots(true);
     }
 
     // Ouvre la page GitHub listant tous les dépôts du compte
@@ -686,6 +699,103 @@
     document.getElementById('select-history-target')
         .addEventListener('change', () => synchroniserSelects('historique'));
 
+    // ---------- COMBO « NOM DU DÉPÔT » (étape 2) ----------
+
+    // Récupère TOUS les dépôts du compte (avec pagination), triés par nom.
+    // Renvoie un tableau d'objets dépôt, ou lève une erreur au message lisible.
+    async function recupererTousLesDepots() {
+        let repos = [];
+        let page = 1;
+        const parPage = 100;
+        while (true) {
+            const url = `https://api.github.com/user/repos?per_page=${parPage}&page=${page}&affiliation=owner&sort=full_name`;
+            const reponse = await fetch(url, { headers: headersGitHub() });
+            if (!reponse.ok) {
+                let detail = `${reponse.status} ${reponse.statusText}`;
+                try { const e = await reponse.json(); if (e && e.message) detail = e.message; } catch (_) {}
+                throw new Error(detail);
+            }
+            const lot = await reponse.json();
+            repos = repos.concat(lot);
+            if (lot.length < parPage) break; // Dernière page atteinte
+            page++;
+            if (page > 10) break;            // Sécurité (1000 dépôts max)
+        }
+        repos.sort((a, b) => a.name.localeCompare(b.name));
+        return repos;
+    }
+
+    // Remplit le datalist (suggestions en saisie libre) ET la liste déroulante
+    // parcourable du champ « Nom du dépôt sur GitHub ».
+    // silencieux = true : aucun message affiché ni bouton touché — utilisé pour
+    // le pré-chargement automatique quand les identifiants sont déjà connus.
+    async function chargerListeDepots(silencieux) {
+        const select = document.getElementById('select-repo-existant');
+        const datalist = document.getElementById('repos-datalist');
+        const btn = document.getElementById('btn-charger-depots');
+
+        if (!config.user || !config.token) {
+            if (!silencieux) {
+                afficherMessage("Renseigne d'abord tes identifiants GitHub à l'étape 1 pour charger la liste.", "error");
+            }
+            return;
+        }
+
+        let texteOrigine = "";
+        if (btn && !silencieux) { texteOrigine = btn.textContent; btn.textContent = "Chargement…"; btn.disabled = true; }
+
+        try {
+            const repos = await recupererTousLesDepots();
+
+            // Datalist : une <option> par dépôt (autocomplétion pendant la frappe)
+            datalist.innerHTML = "";
+            repos.forEach(r => {
+                const opt = document.createElement('option');
+                opt.value = r.name;
+                datalist.appendChild(opt);
+            });
+
+            // Select : liste déroulante entièrement parcourable (idéale sur iPhone)
+            select.innerHTML = "";
+            const placeholder = document.createElement('option');
+            placeholder.value = "";
+            placeholder.textContent = `— choisir parmi mes ${repos.length} dépôt(s) —`;
+            select.appendChild(placeholder);
+            repos.forEach(r => {
+                const opt = document.createElement('option');
+                opt.value = r.name;
+                opt.textContent = r.name;
+                select.appendChild(opt);
+            });
+
+            if (!silencieux) {
+                afficherMessage(`${repos.length} dépôt(s) chargé(s). Choisis-en un dans la liste ou tape son nom.`, "success");
+            }
+        } catch (error) {
+            if (!silencieux) {
+                afficherMessage(
+                    `Impossible de charger la liste des dépôts : ${error.message}\n\n` +
+                    "Vérifie que ton token est valide et possède la portée repo (token classique) " +
+                    "ou la permission Metadata en lecture (token fine-grained).",
+                    "error"
+                );
+            }
+        } finally {
+            if (btn && !silencieux) { btn.textContent = texteOrigine; btn.disabled = false; }
+        }
+    }
+
+    // Quand on choisit un dépôt dans la liste déroulante, on recopie son nom dans
+    // le champ texte — et dans le nom d'affichage s'il est encore vide — pour
+    // pouvoir enchaîner directement sur « Ajouter cette cible ».
+    function choisirDepotExistant() {
+        const repo = document.getElementById('select-repo-existant').value;
+        if (!repo) return;
+        document.getElementById('new-target-repo').value = repo;
+        const champNom = document.getElementById('new-target-name');
+        if (!champNom.value.trim()) champNom.value = repo;
+    }
+
     function ajouterCible() {
         const name = document.getElementById('new-target-name').value.trim();
         const repo = document.getElementById('new-target-repo').value.trim();
@@ -701,6 +811,7 @@
 
         document.getElementById('new-target-name').value = "";
         document.getElementById('new-target-repo').value = "";
+        document.getElementById('select-repo-existant').value = ""; // Retour au libellé « choisir… »
         afficherMessage(`Cible "${name}" ajoutée !`, "success");
     }
 
@@ -1501,6 +1612,9 @@
 
     // Initialisation au chargement de la page
     rafraichirCiblesUI();
+    // Si les identifiants sont déjà mémorisés, on remplit la combo des dépôts
+    // en silence pour qu'elle soit prête sans action de ta part.
+    chargerListeDepots(true);
 </script>
 
 </body>
