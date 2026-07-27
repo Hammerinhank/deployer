@@ -342,7 +342,8 @@
         <label for="select-history-target">Application concernée</label>
         <select id="select-history-target"></select>
 
-        <button class="btn" id="btn-history" onclick="chargerHistorique()" style="background-color: #ff9500;">Charger l'historique</button>
+        <button class="btn" onclick="copierUrlAppli()" style="background-color: #34c759;">🔗 Copier l'URL de l'appli</button>
+        <button class="btn" id="btn-history" onclick="chargerHistorique()" style="background-color: #ff9500; margin-top: 10px;">Charger l'historique</button>
 
         <div id="history-list" style="margin-top: 15px;"></div>
     </div>
@@ -1756,26 +1757,66 @@
         }
     }
 
+    // Copie un texte dans le presse-papier de façon robuste, en particulier sur
+    // iOS Safari. Le piège corrigé ici : navigator.clipboard EXISTE souvent sur
+    // iOS mais son writeText() REJETTE (focus, contexte, permission). L'ancien
+    // code n'utilisait le repli que si clipboard était totalement absent — sur
+    // rejet, il partait dans le catch sans jamais tenter le repli, et rien
+    // n'était copié. Ici, on RATTRAPE le rejet et on bascule vraiment sur la
+    // méthode de secours (execCommand + sélection façon iOS).
+    // Renvoie une promesse résolue à true si la copie a réussi.
+    async function copierTexte(texte) {
+        // 1) API moderne — mais on rattrape son échec au lieu de le laisser filer.
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            try {
+                await navigator.clipboard.writeText(texte);
+                return true;
+            } catch (_) {
+                // iOS a rejeté : on NE s'arrête pas, on tente le repli ci-dessous.
+            }
+        }
+        // 2) Méthode de secours (execCommand). La sélection via Range +
+        //    setSelectionRange est la forme qui fonctionne le mieux sur iOS.
+        try {
+            const zone = document.createElement('textarea');
+            zone.value = texte;
+            zone.readOnly = false;
+            zone.contentEditable = true;
+            zone.style.position = 'fixed';
+            zone.style.top = '0';
+            zone.style.left = '0';
+            zone.style.opacity = '0';
+            document.body.appendChild(zone);
+
+            const range = document.createRange();
+            range.selectNodeContents(zone);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+            zone.setSelectionRange(0, texte.length);
+
+            const ok = document.execCommand('copy');
+            document.body.removeChild(zone);
+            return ok;
+        } catch (_) {
+            return false;
+        }
+    }
+
     // Copie le code HTML d'une version dans le presse-papier
     async function copierVersion(repo, commitSha, dateStr, bouton) {
         try {
             afficherMessage(`Récupération de la version du ${dateStr}...`, "success");
             const contenu = await recupererContenuVersion(repo, commitSha);
 
-            // Méthode moderne (nécessite HTTPS, ce qui est le cas sur github.io / Pages)
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                await navigator.clipboard.writeText(contenu);
-            } else {
-                // Repli pour les contextes non sécurisés
-                const zone = document.createElement('textarea');
-                zone.value = contenu;
-                zone.style.position = 'fixed';
-                zone.style.opacity = '0';
-                document.body.appendChild(zone);
-                zone.focus();
-                zone.select();
-                document.execCommand('copy');
-                document.body.removeChild(zone);
+            const ok = await copierTexte(contenu);
+            if (!ok) {
+                afficherMessage(
+                    `La copie automatique a échoué. Ouvre plutôt la version avec « Voir » puis ` +
+                    `copie le code à la main (version du ${dateStr}).`,
+                    "error"
+                );
+                return;
             }
 
             // Retour visuel sur le bouton lui-même
@@ -1787,6 +1828,37 @@
             afficherMessage(`Code de la version du ${dateStr} copié dans le presse-papier.`, "success");
         } catch (error) {
             afficherMessage(`Impossible de copier cette version : ${error.message}`, "error");
+        }
+    }
+
+    // Copie l'URL GitHub Pages de l'application sélectionnée à l'étape 4.
+    // Cette URL (https://<user>.github.io/<repo>/) sert TOUJOURS la dernière
+    // version déployée : pas de numéro de commit, donc toujours à jour.
+    async function copierUrlAppli() {
+        if (!verifierConfig()) return;
+        const repo = document.getElementById('select-history-target').value;
+        if (!repo) {
+            afficherMessage("Ajoute et sélectionne une application à l'étape 2 d'abord.", "error");
+            return;
+        }
+        // Le sous-domaine github.io est toujours en minuscules.
+        const url = `https://${config.user.toLowerCase()}.github.io/${repo}/`;
+
+        const ok = await copierTexte(url);
+        if (ok) {
+            afficherMessage(
+                `🔗 URL copiée dans le presse-papier :\n${url}\n\n` +
+                "Elle ouvrira toujours la dernière version déployée de l'appli.",
+                "success"
+            );
+        } else {
+            // Même si la copie échoue, on affiche l'URL pour un copier-coller manuel.
+            afficherMessage(
+                "Le presse-papier n'a pas pu être utilisé sur cet appareil.\n\n" +
+                "Voici l'URL à copier à la main (elle ouvre toujours la dernière version) :\n\n" +
+                url,
+                "error"
+            );
         }
     }
 
