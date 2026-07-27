@@ -24,28 +24,6 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
         h2 { font-size: 18px; margin-top: 0; color: #0071e3; }
-
-        /* Sections repliables (cartes 1 et 2) : le titre <summary> ouvre/ferme.
-           On masque le triangle natif et on affiche notre propre chevron. */
-        .section-repliable > summary {
-            list-style: none;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            -webkit-tap-highlight-color: transparent;
-        }
-        .section-repliable > summary::-webkit-details-marker { display: none; }
-        .section-repliable > summary::before {
-            content: "\25B8"; /* ▸ */
-            color: #0071e3;
-            font-size: 15px;
-            transition: transform 0.15s ease;
-            flex-shrink: 0;
-        }
-        .section-repliable[open] > summary::before { transform: rotate(90deg); }
-        .section-repliable > summary h2 { margin: 0; }
-        .section-contenu { margin-top: 15px; }
         label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; color: #86868b; }
         input, select, textarea {
             width: 100%;
@@ -85,72 +63,15 @@
         .error { background-color: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
         .target-item {
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 8px;
             background: #f5f5f7;
             padding: 10px;
             border-radius: 6px;
             margin-bottom: 8px;
             font-size: 14px;
-            /* On coupe la sélection de texte et le menu contextuel iOS sur la
-               ligne : c'est ce qui empêchait de « saisir » l'item (Safari
-               démarrait sa loupe de sélection au lieu du glissement). */
-            -webkit-user-select: none;
-            user-select: none;
-            -webkit-touch-callout: none;
         }
-        /* Le champ de saisie du mode édition doit, lui, rester sélectionnable. */
-        .target-item input {
-            -webkit-user-select: text;
-            user-select: text;
-            -webkit-touch-callout: default;
-        }
-        /* Ligne en cours de glissement : légèrement soulevée et surlignée */
-        .target-item.dragging {
-            opacity: 0.9;
-            background: #eaf3ff;
-            box-shadow: 0 6px 18px rgba(0,0,0,0.18);
-        }
-        /* Pendant un glissement, on interdit toute sélection ailleurs sur la page. */
-        body.drag-actif, body.drag-actif * {
-            -webkit-user-select: none !important;
-            user-select: none !important;
-        }
-        /* Poignée « ⠿ » servant de prise pour réordonner (souris et doigt).
-           - touch-action: none empêche la page de défiler pendant le glissement ;
-           - le fond gris et la taille en font une prise facile à viser au doigt. */
-        .drag-handle {
-            flex-shrink: 0;
-            cursor: grab;
-            color: #6e6e73;
-            font-size: 22px;
-            line-height: 1;
-            padding: 8px 10px;
-            margin: -2px 0;
-            border-radius: 6px;
-            background: #e5e5ea;
-            -webkit-user-select: none;
-            user-select: none;
-            -webkit-touch-callout: none;
-            touch-action: none;
-        }
-        .drag-handle:active { cursor: grabbing; background: #d1d1d6; }
-        .target-info { flex: 1; min-width: 0; word-break: break-word; }
-        .target-nom { color: #0071e3; text-decoration: none; font-weight: 600; }
-        .target-repo { display: block; color: #86868b; font-size: 12px; margin-top: 2px; }
-        .target-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-        .btn-edit-cible {
-            background: #0071e3;
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            padding: 6px 12px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-        .btn-edit-cible:active { background: #005bb5; }
-        .delete-btn { flex-shrink: 0; color: #ff3b30; background: none; border: none; font-weight: bold; cursor: pointer; }
+        .delete-btn { color: #ff3b30; background: none; border: none; font-weight: bold; cursor: pointer; }
 
         /* Styles de l'historique */
         .commit-item {
@@ -265,60 +186,42 @@
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
-        <details class="section-repliable">
-            <summary><h2>1. Connexion GitHub</h2></summary>
-            <div class="section-contenu">
-                <label for="gh-user">Nom d'utilisateur GitHub</label>
-                <input type="text" id="gh-user" placeholder="Ex: henritavernier">
-                
-                <label for="gh-token">Token d'accès personnel (PAT)</label>
-                <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxx">
-                <button class="btn" onclick="window.open('https://github.com/settings/tokens', '_blank')" style="background-color: #6e6e73;">🔑 Tokens classiques</button>
-                <button class="btn" onclick="window.open('https://github.com/settings/tokens?type=beta', '_blank')" style="background-color: #6e6e73; margin-top: 10px;">🔑 Tokens fine-grained</button>
-                <button class="btn" onclick="sauvegarderConfig()" style="margin-top: 10px;">Enregistrer les identifiants</button>
-                <button class="btn" onclick="ouvrirDepotsGithub()" style="background-color: #6e6e73; margin-top: 10px;">📂 Voir mes dépôts GitHub</button>
-                <button class="btn" onclick="chargerDescriptifs()" style="background-color: #5856d6; margin-top: 10px;">📝 Liste des descriptifs</button>
-                <div id="descriptifs-list" style="margin-top: 15px;"></div>
-            </div>
-        </details>
+        <h2>1. Connexion GitHub</h2>
+        <label for="gh-user">Nom d'utilisateur GitHub</label>
+        <input type="text" id="gh-user" placeholder="Ex: henritavernier">
+        
+        <label for="gh-token">Token d'accès personnel (PAT)</label>
+        <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxx">
+        <button class="btn" onclick="window.open('https://github.com/settings/tokens', '_blank')" style="background-color: #6e6e73;">🔑 Tokens classiques</button>
+        <button class="btn" onclick="window.open('https://github.com/settings/tokens?type=beta', '_blank')" style="background-color: #6e6e73; margin-top: 10px;">🔑 Tokens fine-grained</button>
+        <button class="btn" onclick="sauvegarderConfig()" style="margin-top: 10px;">Enregistrer les identifiants</button>
+        <button class="btn" onclick="ouvrirDepotsGithub()" style="background-color: #6e6e73; margin-top: 10px;">📂 Voir mes dépôts GitHub</button>
+        <button class="btn" onclick="chargerDescriptifs()" style="background-color: #5856d6; margin-top: 10px;">📝 Liste des descriptifs</button>
+        <div id="descriptifs-list" style="margin-top: 15px;"></div>
     </div>
 
     <!-- 2. GESTION DES APPLICATIONS CIBLES -->
     <div class="card">
-        <details class="section-repliable">
-            <summary><h2>2. Gestion des Applications Cibles</h2></summary>
-            <div class="section-contenu">
-                <div id="target-list"></div>
-                <hr style="border: 0; border-top: 1px solid #e5e5ea; margin: 15px 0;">
-                <label for="new-target-name">Nom de l'application (Affichage)</label>
-                <input type="text" id="new-target-name" placeholder="Ex: Ma Super Boussole">
+        <h2>2. Gestion des Applications Cibles</h2>
+        <div id="target-list"></div>
+        <hr style="border: 0; border-top: 1px solid #e5e5ea; margin: 15px 0;">
+        <label for="new-target-name">Nom de l'application (Affichage)</label>
+        <input type="text" id="new-target-name" placeholder="Ex: Ma Super Boussole">
+        <label for="new-target-repo">Nom du dépôt sur GitHub</label>
+        <input type="text" id="new-target-repo" placeholder="Ex: boussole">
+        <button class="btn btn-secondary" onclick="ajouterCible()">Ajouter cette cible</button>
 
-                <label for="new-target-repo">Nom du dépôt sur GitHub</label>
-                <input type="text" id="new-target-repo" list="repos-datalist" placeholder="Tape le nom, ou choisis ci-dessous">
-                <!-- Suggestions en saisie libre (combo) alimentées depuis GitHub -->
-                <datalist id="repos-datalist"></datalist>
-
-                <label for="select-repo-existant">…ou choisir un dépôt existant</label>
-                <select id="select-repo-existant" onchange="choisirDepotExistant()">
-                    <option value="">— aucun dépôt chargé —</option>
-                </select>
-                <button class="btn" id="btn-charger-depots" onclick="chargerListeDepots(false)" style="background-color: #6e6e73; margin-bottom: 15px;">🔄 Charger / rafraîchir la liste de mes dépôts</button>
-
-                <button class="btn btn-secondary" onclick="ajouterCible()">Ajouter cette cible</button>
-
-                <hr style="border: 0; border-top: 1px solid #e5e5ea; margin: 22px 0;">
-                <h2 style="font-size: 16px;">➕ Créer un nouveau dépôt</h2>
-                <p style="font-size: 13px; color: #86868b; margin-top: 0;">
-                    Crée un dépôt tout neuf, y ajoute une page de départ, active GitHub Pages
-                    et l'enregistre automatiquement comme cible ci-dessus.
-                </p>
-                <label for="new-repo-name">Nom du dépôt (sur GitHub)</label>
-                <input type="text" id="new-repo-name" placeholder="Ex: ma-nouvelle-app">
-                <label for="new-repo-display">Nom d'affichage (optionnel)</label>
-                <input type="text" id="new-repo-display" placeholder="Ex: Ma Nouvelle App">
-                <button class="btn" id="btn-creer-depot" onclick="creerNouveauDepot()" style="background-color: #5856d6;">Créer le dépôt</button>
-            </div>
-        </details>
+        <hr style="border: 0; border-top: 1px solid #e5e5ea; margin: 22px 0;">
+        <h2 style="font-size: 16px;">➕ Créer un nouveau dépôt</h2>
+        <p style="font-size: 13px; color: #86868b; margin-top: 0;">
+            Crée un dépôt tout neuf, y ajoute une page de départ, active GitHub Pages
+            et l'enregistre automatiquement comme cible ci-dessus.
+        </p>
+        <label for="new-repo-name">Nom du dépôt (sur GitHub)</label>
+        <input type="text" id="new-repo-name" placeholder="Ex: ma-nouvelle-app">
+        <label for="new-repo-display">Nom d'affichage (optionnel)</label>
+        <input type="text" id="new-repo-display" placeholder="Ex: Ma Nouvelle App">
+        <button class="btn" id="btn-creer-depot" onclick="creerNouveauDepot()" style="background-color: #5856d6;">Créer le dépôt</button>
     </div>
 
     <!-- 3. ZONE DE DÉPLOIEMENT -->
@@ -343,6 +246,7 @@
         <select id="select-history-target"></select>
 
         <button class="btn" id="btn-history" onclick="chargerHistorique()" style="background-color: #ff9500;">Charger l'historique</button>
+        <button class="btn" id="btn-copier-url" onclick="copierUrlApp(this)" style="background-color: #34c759; margin-top: 10px;">🔗 Copier l'URL de l'appli</button>
 
         <div id="history-list" style="margin-top: 15px;"></div>
     </div>
@@ -459,9 +363,6 @@
         config.token = nouveauToken;
         localStorage.setItem('deployer_config', JSON.stringify(config));
         afficherMessage("Identifiants enregistrés localement avec succès !", "success");
-        // Les identifiants sont valides : on remplit la combo des dépôts en
-        // arrière-plan (silencieux, pour ne pas masquer le message ci-dessus).
-        chargerListeDepots(true);
     }
 
     // Ouvre la page GitHub listant tous les dépôts du compte
@@ -647,52 +548,13 @@
             // Détermination dynamique de l'URL d'archivage sur GitHub
             const repoUrl = `https://github.com/${config.user || ''}/${cible.repo}`;
 
-            // On construit chaque ligne en éléments DOM (et non plus en innerHTML)
-            // pour pouvoir y attacher le glisser-déposer et l'édition sur place.
-            const item = document.createElement('div');
-            item.className = 'target-item';
-            item.dataset.index = index; // Index d'origine, utilisé après un glissement
-
-            // Poignée de glissement (à gauche) : c'est la prise pour réordonner.
-            const handle = document.createElement('span');
-            handle.className = 'drag-handle';
-            handle.textContent = '⠿';
-            handle.title = 'Glisser pour réordonner';
-            activerDragCible(handle, item);
-
-            // Bloc central : nom d'affichage cliquable + nom du dépôt en dessous.
-            const info = document.createElement('div');
-            info.className = 'target-info';
-            const lien = document.createElement('a');
-            lien.href = repoUrl;
-            lien.target = '_blank';
-            lien.className = 'target-nom';
-            lien.textContent = cible.name;
-            const repoLabel = document.createElement('span');
-            repoLabel.className = 'target-repo';
-            repoLabel.textContent = `Dépôt : ${cible.repo}`;
-            info.appendChild(lien);
-            info.appendChild(repoLabel);
-
-            // Actions (à droite) : Edit (changer le libellé) + Supprimer.
-            const actions = document.createElement('div');
-            actions.className = 'target-actions';
-            const btnEdit = document.createElement('button');
-            btnEdit.className = 'btn-edit-cible';
-            btnEdit.textContent = 'Edit';
-            btnEdit.addEventListener('click', () => modifierLibelleCible(item, index));
-            const btnSuppr = document.createElement('button');
-            btnSuppr.className = 'delete-btn';
-            btnSuppr.textContent = 'Supprimer';
-            btnSuppr.addEventListener('click', () => supprimerCible(index));
-            actions.appendChild(btnEdit);
-            actions.appendChild(btnSuppr);
-
-            item.appendChild(handle);
-            item.appendChild(info);
-            item.appendChild(actions);
-            listDiv.appendChild(item);
-
+            // Remplir la liste de gestion avec le lien cliquable sur le nom
+            listDiv.innerHTML += `
+                <div class="target-item">
+                    <strong><a href="${repoUrl}" target="_blank" style="color: #0071e3; text-decoration: none;">${cible.name}</a></strong> (Dépôt : ${cible.repo})
+                    <button class="delete-btn" onclick="supprimerCible(${index})">Supprimer</button>
+                </div>`;
+            
             // Remplir les deux menus déroulants (déploiement + historique)
             [select, selectHistory].forEach(s => {
                 const opt = document.createElement('option');
@@ -729,103 +591,6 @@
     document.getElementById('select-history-target')
         .addEventListener('change', () => synchroniserSelects('historique'));
 
-    // ---------- COMBO « NOM DU DÉPÔT » (étape 2) ----------
-
-    // Récupère TOUS les dépôts du compte (avec pagination), triés par nom.
-    // Renvoie un tableau d'objets dépôt, ou lève une erreur au message lisible.
-    async function recupererTousLesDepots() {
-        let repos = [];
-        let page = 1;
-        const parPage = 100;
-        while (true) {
-            const url = `https://api.github.com/user/repos?per_page=${parPage}&page=${page}&affiliation=owner&sort=full_name`;
-            const reponse = await fetch(url, { headers: headersGitHub() });
-            if (!reponse.ok) {
-                let detail = `${reponse.status} ${reponse.statusText}`;
-                try { const e = await reponse.json(); if (e && e.message) detail = e.message; } catch (_) {}
-                throw new Error(detail);
-            }
-            const lot = await reponse.json();
-            repos = repos.concat(lot);
-            if (lot.length < parPage) break; // Dernière page atteinte
-            page++;
-            if (page > 10) break;            // Sécurité (1000 dépôts max)
-        }
-        repos.sort((a, b) => a.name.localeCompare(b.name));
-        return repos;
-    }
-
-    // Remplit le datalist (suggestions en saisie libre) ET la liste déroulante
-    // parcourable du champ « Nom du dépôt sur GitHub ».
-    // silencieux = true : aucun message affiché ni bouton touché — utilisé pour
-    // le pré-chargement automatique quand les identifiants sont déjà connus.
-    async function chargerListeDepots(silencieux) {
-        const select = document.getElementById('select-repo-existant');
-        const datalist = document.getElementById('repos-datalist');
-        const btn = document.getElementById('btn-charger-depots');
-
-        if (!config.user || !config.token) {
-            if (!silencieux) {
-                afficherMessage("Renseigne d'abord tes identifiants GitHub à l'étape 1 pour charger la liste.", "error");
-            }
-            return;
-        }
-
-        let texteOrigine = "";
-        if (btn && !silencieux) { texteOrigine = btn.textContent; btn.textContent = "Chargement…"; btn.disabled = true; }
-
-        try {
-            const repos = await recupererTousLesDepots();
-
-            // Datalist : une <option> par dépôt (autocomplétion pendant la frappe)
-            datalist.innerHTML = "";
-            repos.forEach(r => {
-                const opt = document.createElement('option');
-                opt.value = r.name;
-                datalist.appendChild(opt);
-            });
-
-            // Select : liste déroulante entièrement parcourable (idéale sur iPhone)
-            select.innerHTML = "";
-            const placeholder = document.createElement('option');
-            placeholder.value = "";
-            placeholder.textContent = `— choisir parmi mes ${repos.length} dépôt(s) —`;
-            select.appendChild(placeholder);
-            repos.forEach(r => {
-                const opt = document.createElement('option');
-                opt.value = r.name;
-                opt.textContent = r.name;
-                select.appendChild(opt);
-            });
-
-            if (!silencieux) {
-                afficherMessage(`${repos.length} dépôt(s) chargé(s). Choisis-en un dans la liste ou tape son nom.`, "success");
-            }
-        } catch (error) {
-            if (!silencieux) {
-                afficherMessage(
-                    `Impossible de charger la liste des dépôts : ${error.message}\n\n` +
-                    "Vérifie que ton token est valide et possède la portée repo (token classique) " +
-                    "ou la permission Metadata en lecture (token fine-grained).",
-                    "error"
-                );
-            }
-        } finally {
-            if (btn && !silencieux) { btn.textContent = texteOrigine; btn.disabled = false; }
-        }
-    }
-
-    // Quand on choisit un dépôt dans la liste déroulante, on recopie son nom dans
-    // le champ texte — et dans le nom d'affichage s'il est encore vide — pour
-    // pouvoir enchaîner directement sur « Ajouter cette cible ».
-    function choisirDepotExistant() {
-        const repo = document.getElementById('select-repo-existant').value;
-        if (!repo) return;
-        document.getElementById('new-target-repo').value = repo;
-        const champNom = document.getElementById('new-target-name');
-        if (!champNom.value.trim()) champNom.value = repo;
-    }
-
     function ajouterCible() {
         const name = document.getElementById('new-target-name').value.trim();
         const repo = document.getElementById('new-target-repo').value.trim();
@@ -841,7 +606,6 @@
 
         document.getElementById('new-target-name').value = "";
         document.getElementById('new-target-repo').value = "";
-        document.getElementById('select-repo-existant').value = ""; // Retour au libellé « choisir… »
         afficherMessage(`Cible "${name}" ajoutée !`, "success");
     }
 
@@ -849,164 +613,6 @@
         cibles.splice(index, 1);
         localStorage.setItem('deployer_cibles', JSON.stringify(cibles));
         rafraichirCiblesUI();
-    }
-
-    // ---------- RÉORDONNANCEMENT PAR GLISSEMENT (drag & drop) ----------
-    // On maintient la poignée « ⠿ » d'une ligne et on la glisse vers le haut ou
-    // le bas ; l'ordre est enregistré dans localStorage au relâchement.
-    //
-    // Choix technique important : on utilise ici les ÉVÉNEMENTS TACTILES natifs
-    // (touchstart/touchmove/touchend) pour le doigt, et les événements souris
-    // pour l'iMac — et NON les Pointer Events. Sur iPhone, les Pointer Events +
-    // setPointerCapture sont capricieux, et surtout Safari lançait sa propre
-    // sélection de texte (la loupe) avant qu'on puisse « saisir » la ligne.
-    // Avec les événements tactiles, un preventDefault() dès le touchstart coupe
-    // net cette sélection et le défilement, et les touchmove suivants sont
-    // toujours livrés à la poignée où le geste a commencé, même si le doigt
-    // s'en éloigne. C'est la méthode la plus fiable sur iOS.
-    function activerDragCible(handle, item) {
-        // Début du glissement : on soulève la ligne et on neutralise sa capture
-        // du pointeur, pour que elementFromPoint voie la ligne SOUS le doigt.
-        function debut() {
-            item.classList.add('dragging');
-            item.style.pointerEvents = 'none';
-            document.body.classList.add('drag-actif');
-        }
-
-        // Déplacement : on trouve la ligne sous le doigt/curseur et on réinsère
-        // la ligne glissée avant ou après, selon qu'on dépasse son milieu.
-        function deplacer(clientX, clientY) {
-            const listDiv = document.getElementById('target-list');
-            const sous = document.elementFromPoint(clientX, clientY);
-            if (!sous) return;
-            const ligne = sous.closest('.target-item');
-            if (!ligne || ligne === item || ligne.parentElement !== listDiv) return;
-            const rect = ligne.getBoundingClientRect();
-            const avant = clientY < rect.top + rect.height / 2;
-            listDiv.insertBefore(item, avant ? ligne : ligne.nextSibling);
-        }
-
-        // Fin du glissement : on repose la ligne, on recalcule l'ordre du
-        // tableau à partir de l'ordre affiché (via l'index d'origine mémorisé
-        // sur chaque ligne), on enregistre, puis on redessine tout au propre.
-        function fin() {
-            item.classList.remove('dragging');
-            item.style.pointerEvents = '';
-            document.body.classList.remove('drag-actif');
-
-            const listDiv = document.getElementById('target-list');
-            const nouvelOrdre = [...listDiv.querySelectorAll('.target-item')]
-                .map(el => cibles[parseInt(el.dataset.index, 10)])
-                .filter(Boolean);
-
-            if (nouvelOrdre.length === cibles.length) {
-                cibles = nouvelOrdre;
-                localStorage.setItem('deployer_cibles', JSON.stringify(cibles));
-            }
-            rafraichirCiblesUI();
-        }
-
-        // ----- DOIGT (iPhone) : événements tactiles, non passifs -----
-        handle.addEventListener('touchstart', (e) => {
-            if (e.touches.length !== 1) return; // On ignore le multi-touch
-            e.preventDefault();                 // Coupe sélection + défilement
-            debut();
-
-            function onMove(ev) {
-                ev.preventDefault();
-                const t = ev.touches[0];
-                deplacer(t.clientX, t.clientY);
-            }
-            function onEnd() {
-                handle.removeEventListener('touchmove', onMove);
-                handle.removeEventListener('touchend', onEnd);
-                handle.removeEventListener('touchcancel', onEnd);
-                fin();
-            }
-            // Les touchmove restent livrés à la poignée pour toute la durée du
-            // geste, où que parte le doigt. { passive: false } autorise le
-            // preventDefault qui bloque le défilement de la page.
-            handle.addEventListener('touchmove', onMove, { passive: false });
-            handle.addEventListener('touchend', onEnd);
-            handle.addEventListener('touchcancel', onEnd);
-        }, { passive: false });
-
-        // ----- SOURIS (iMac) -----
-        handle.addEventListener('mousedown', (e) => {
-            if (e.button !== 0) return; // Bouton principal uniquement
-            e.preventDefault();
-            debut();
-
-            function onMove(ev) { deplacer(ev.clientX, ev.clientY); }
-            function onUp() {
-                document.removeEventListener('mousemove', onMove);
-                document.removeEventListener('mouseup', onUp);
-                fin();
-            }
-            document.addEventListener('mousemove', onMove);
-            document.addEventListener('mouseup', onUp);
-        });
-    }
-
-    // ---------- ÉDITION DU LIBELLÉ D'UNE CIBLE ----------
-    // Édition sur place : seul le libellé (nom d'affichage) change. Le nom du
-    // dépôt GitHub, lui, reste intact — c'est la clé qui identifie la cible.
-    function modifierLibelleCible(item, index) {
-        const cible = cibles[index];
-        item.innerHTML = "";
-        // Pendant l'édition, on empile les éléments verticalement.
-        item.style.flexDirection = 'column';
-        item.style.alignItems = 'stretch';
-
-        const label = document.createElement('label');
-        label.style.marginBottom = '4px';
-        label.textContent = `Libellé pour le dépôt « ${cible.repo} »`;
-
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.value = cible.name;
-        input.placeholder = "Nom d'affichage";
-        input.style.marginBottom = '8px';
-
-        const actions = document.createElement('div');
-        actions.style.display = 'flex';
-        actions.style.gap = '8px';
-
-        const btnSave = document.createElement('button');
-        btnSave.className = 'btn-small btn-copy';
-        btnSave.textContent = 'Enregistrer';
-
-        const btnCancel = document.createElement('button');
-        btnCancel.className = 'btn-small btn-view';
-        btnCancel.textContent = 'Annuler';
-        btnCancel.addEventListener('click', () => rafraichirCiblesUI());
-
-        btnSave.addEventListener('click', () => {
-            const nouveau = input.value.trim();
-            if (!nouveau) {
-                afficherMessage("Le libellé ne peut pas être vide.", "error");
-                input.focus();
-                return;
-            }
-            cibles[index].name = nouveau;
-            localStorage.setItem('deployer_cibles', JSON.stringify(cibles));
-            rafraichirCiblesUI();
-            afficherMessage(`Libellé mis à jour : « ${nouveau} ».`, "success");
-        });
-
-        // Entrée pour valider, Échap pour annuler.
-        input.addEventListener('keydown', (ev) => {
-            if (ev.key === 'Enter') { ev.preventDefault(); btnSave.click(); }
-            else if (ev.key === 'Escape') { ev.preventDefault(); btnCancel.click(); }
-        });
-
-        actions.appendChild(btnSave);
-        actions.appendChild(btnCancel);
-        item.appendChild(label);
-        item.appendChild(input);
-        item.appendChild(actions);
-        input.focus();
-        input.select();
     }
 
     // Ajoute une cible sans créer de doublon, puis rafraîchit l'interface.
@@ -1189,30 +795,6 @@
         return true;
     }
 
-    // Cherche les fichiers dont le nom ne diffère QUE par la casse (ex :
-    // « index.html » ET « Index.html »). GitHub les considère comme deux
-    // fichiers distincts, mais l'API Contents et GitHub Pages peuvent les
-    // confondre : c'est la cause typique d'un déploiement "réussi" (un commit
-    // est bien créé) qui pourtant ne change RIEN à l'écran, parce que l'écriture
-    // atterrit sur le mauvais fichier.
-    // Renvoie la liste des noms trouvés (ex : ["Index.html", "index.html"])
-    // ou null si la vérification n'a pas pu être faite.
-    async function detecterDoublonsCasse(repo, nomFichier) {
-        try {
-            const url = `https://api.github.com/repos/${config.user}/${repo}/contents/`;
-            const rep = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
-            if (!rep.ok) return null;
-            const fichiers = await rep.json();
-            if (!Array.isArray(fichiers)) return null;
-            const cible = nomFichier.toLowerCase();
-            return fichiers
-                .filter(f => f.type === 'file' && f.name.toLowerCase() === cible)
-                .map(f => f.name);
-        } catch (_) {
-            return null;
-        }
-    }
-
     // ---------- DÉPLOIEMENT ----------
 
     async function deployerCode() {
@@ -1249,37 +831,15 @@
         const url = `https://api.github.com/repos/${config.user}/${repo}/contents/index.html`;
         let sha = null;
 
-        // Étape A : On lit index.html en ligne pour récupérer son identifiant (SHA)
-        // ET son contenu actuel. Lecture SANS cache, pour comparer avec l'état réel.
-        let contenuActuel = null;
+        // Étape A : On cherche si index.html existe déjà pour obtenir son identifiant unique (SHA)
         try {
-            const reponseCheck = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
+            const reponseCheck = await fetch(url, { headers: headersGitHub() });
             if (reponseCheck.ok) {
                 const donneesFile = await reponseCheck.json();
                 sha = donneesFile.sha;
-                try { contenuActuel = decoderBase64(donneesFile.content); } catch (_) { contenuActuel = null; }
             }
         } catch (err) {
             console.log("Nouveau fichier ou erreur de lecture", err);
-        }
-
-        // Étape A bis : test anti-doublon. Si le code à envoyer est RIGOUREUSEMENT
-        // identique à ce qui est déjà en ligne, l'API Contents de GitHub ne crée
-        // AUCUN nouveau commit : elle répond "OK" sans rien changer. On te le dit
-        // franchement, au lieu d'un faux succès, et on n'envoie rien.
-        if (contenuActuel !== null && contenuActuel === code) {
-            afficherMessage(
-                "ℹ️ RIEN À DÉPLOYER\n\n" +
-                "Le code que tu veux envoyer est rigoureusement identique à la version " +
-                "déjà en ligne.\n\n" +
-                "GitHub ne créerait aucune nouvelle version (son API considère qu'il n'y " +
-                "a rien à changer). Aucun commit n'a donc été créé, et ton commentaire " +
-                "n'a pas été enregistré.\n\n" +
-                "Si tu voulais vraiment marquer une nouvelle version, modifie au moins un " +
-                "caractère du code avant de renvoyer.",
-                "error"
-            );
-            return;
         }
 
         // Étape B : Encodage propre du texte en Base64
@@ -1300,110 +860,13 @@
                 body: JSON.stringify(bodyPayload)
             });
 
-            // Cas 1 : l'API refuse carrément l'écriture. Message d'erreur clair, on s'arrête.
-            if (!reponsePut.ok) {
-                const errData = await reponsePut.json().catch(() => ({}));
-                afficherMessage(`Échec du déploiement : ${errData.message || reponsePut.statusText}`, "error");
-                return;
-            }
-
-            // À partir d'ici, le PUT a réussi : un commit A ÉTÉ créé.
-            // MAIS "commit créé" ne veut PAS dire "la bonne page a changé".
-            // C'est exactement le piège qui t'a joué des tours : succès annoncé,
-            // aucun changement à l'écran. On vérifie donc TOUT avant de fêter ça.
-            const resultat = await reponsePut.json();
-            const shaCommit = (resultat.commit && resultat.commit.sha)
-                ? resultat.commit.sha.substring(0, 7) : "inconnu";
-            const cheminEcrit = (resultat.content && resultat.content.path)
-                ? resultat.content.path : "index.html";
-
-            // ---- VÉRIFICATION 1 : GitHub a-t-il écrit dans le BON fichier ? ----
-            // On a demandé « index.html ». Si GitHub répond avoir écrit dans
-            // « Index.html » (ou tout autre nom), c'est le piège de la casse :
-            // la page réellement affichée ne changera pas.
-            if (cheminEcrit !== "index.html") {
-                afficherMessage(
-                    "⚠️ FAUX SUCCÈS DÉTECTÉ\n\n" +
-                    `Le commit ${shaCommit} a bien été créé, MAIS GitHub dit avoir écrit ` +
-                    `dans « ${cheminEcrit} », et non dans « index.html ».\n\n` +
-                    "C'est très probablement pour ça que ton appli ne changeait pas : la " +
-                    "page réellement affichée est « index.html » (minuscule), pas celle-ci.\n\n" +
-                    "➡️ Va dans le dépôt sur GitHub et SUPPRIME le fichier en double " +
-                    "(celui qui ne diffère que par une majuscule).\n\n" +
-                    "Ton code n'a pas été perdu, il est toujours dans la zone ci-dessus.",
-                    "error"
-                );
-                return;
-            }
-
-            // ---- VÉRIFICATION 2 : relecture + comparaison caractère par caractère ----
-            // On relit le fichier réellement en ligne et on compare, exactement,
-            // avec ce que tu viens d'envoyer. C'est LA preuve que ça a marché.
-            afficherMessage(`Commit ${shaCommit} créé. Vérification du contenu réellement en ligne...`, "success");
-
-            let verifOk = false;
-            let detailVerif = "";
-            try {
-                const relecture = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
-                if (relecture.ok) {
-                    const donneesRelues = await relecture.json();
-                    const contenuEnLigne = decoderBase64(donneesRelues.content);
-                    if (contenuEnLigne === code) {
-                        verifOk = true;
-                    } else {
-                        detailVerif =
-                            `Le contenu en ligne fait ${contenuEnLigne.length} caractères, ` +
-                            `alors que tu en as envoyé ${code.length}. Ils ne correspondent pas.`;
-                    }
-                } else {
-                    detailVerif = `Relecture impossible (${relecture.status} ${relecture.statusText}).`;
-                }
-            } catch (e) {
-                detailVerif = "Relecture impossible : " + e.message;
-            }
-
-            // ---- VÉRIFICATION 3 : reste-t-il des fichiers en double (casse) ? ----
-            // Même si l'écriture a réussi cette fois, un doublon qui traîne fera
-            // rater un prochain déploiement. On prévient tant qu'il existe.
-            const doublons = await detecterDoublonsCasse(repo, "index.html");
-            const aDoublons = Array.isArray(doublons) && doublons.length > 1;
-
-            // ---- Verdict final ----
-            if (verifOk && !aDoublons) {
-                afficherMessage(
-                    "✅ Déploiement VÉRIFIÉ !\n\n" +
-                    `Commit ${shaCommit} — le contenu en ligne correspond exactement à ce ` +
-                    "que tu as envoyé.\n\n" +
-                    "Ton application sera à jour sur ton iPhone d'ici 30 à 60 secondes.",
-                    "success"
-                );
-                // Tout est propre : on peut vider les champs sans risque.
-                document.getElementById('html-code').value = "";
-                document.getElementById('commit-comment').value = "";
-            } else if (verifOk && aDoublons) {
-                afficherMessage(
-                    `✅ Le contenu a bien été mis à jour (commit ${shaCommit}).\n\n` +
-                    "⚠️ MAIS ton dépôt contient plusieurs fichiers qui ne diffèrent que par " +
-                    `la casse :\n\n   ${doublons.join("   ·   ")}\n\n` +
-                    "C'est un piège : un prochain déploiement risque d'écrire dans le mauvais " +
-                    "et de ne rien changer à l'écran (c'est exactement ce qui s'est passé " +
-                    "l'autre fois). Supprime le(s) doublon(s) sur GitHub pour être tranquille.\n\n" +
-                    "Par précaution, ton code n'a PAS été effacé de la zone ci-dessus.",
-                    "error"
-                );
-                // On ne vide pas les champs : on veut que tu règles le doublon d'abord.
+            if (reponsePut.ok) {
+                afficherMessage("Félicitations ! Le code a été poussé sur GitHub.\nVotre application sera mise à jour sur votre iPhone d'ici 30 à 60 secondes.", "success");
+                document.getElementById('html-code').value = ""; // On vide la zone après succès
+                document.getElementById('commit-comment').value = ""; // On vide aussi le commentaire
             } else {
-                afficherMessage(
-                    "⚠️ FAUX SUCCÈS POSSIBLE\n\n" +
-                    `Le commit ${shaCommit} a été créé, mais la vérification du contenu réellement ` +
-                    "en ligne a échoué :\n\n" + detailVerif + "\n\n" +
-                    (aDoublons
-                        ? `Il y a aussi des fichiers en double : ${doublons.join(", ")}. C'est très probablement la cause.\n\n`
-                        : "") +
-                    "Ne considère PAS cette version comme déployée. Ton code reste dans la zone " +
-                    "ci-dessus, tu ne l'as pas perdu.",
-                    "error"
-                );
+                const errData = await reponsePut.json();
+                afficherMessage(`Échec du déploiement : ${errData.message || reponsePut.statusText}`, "error");
             }
         } catch (error) {
             afficherMessage(`Erreur réseau : ${error.message}`, "error");
@@ -1578,62 +1041,12 @@
                 })
             });
 
-            if (!reponsePut.ok) {
-                const errData = await reponsePut.json();
-                afficherMessage(`Échec de la restauration : ${errData.message || reponsePut.statusText}`, "error");
-                return;
-            }
-
-            // Même logique de vérification que pour un déploiement : on confirme
-            // que le fichier réellement en ligne = l'ancien contenu qu'on restaure.
-            const resultat = await reponsePut.json();
-            const shaCommit = (resultat.commit && resultat.commit.sha)
-                ? resultat.commit.sha.substring(0, 7) : "inconnu";
-            const cheminEcrit = (resultat.content && resultat.content.path)
-                ? resultat.content.path : "index.html";
-
-            if (cheminEcrit !== "index.html") {
-                afficherMessage(
-                    "⚠️ FAUX SUCCÈS DÉTECTÉ pendant la restauration\n\n" +
-                    `Le commit ${shaCommit} a été créé, mais GitHub a écrit dans ` +
-                    `« ${cheminEcrit} » et non « index.html ». Supprime le fichier en ` +
-                    "double (majuscule) sur le dépôt.",
-                    "error"
-                );
-                return;
-            }
-
-            let verifOk = false;
-            let detailVerif = "";
-            try {
-                const relecture = await fetch(urlActuel, { headers: headersGitHub(), cache: "no-store" });
-                if (relecture.ok) {
-                    const relues = await relecture.json();
-                    if (decoderBase64(relues.content) === ancienContenu) {
-                        verifOk = true;
-                    } else {
-                        detailVerif = "Le contenu en ligne ne correspond pas à la version restaurée.";
-                    }
-                } else {
-                    detailVerif = `Relecture impossible (${relecture.status}).`;
-                }
-            } catch (e) {
-                detailVerif = "Relecture impossible : " + e.message;
-            }
-
-            if (verifOk) {
-                afficherMessage(
-                    `✅ Version du ${dateStr} restaurée et VÉRIFIÉE (commit ${shaCommit}).\n` +
-                    "Ton application sera à jour d'ici 30 à 60 secondes.",
-                    "success"
-                );
+            if (reponsePut.ok) {
+                afficherMessage(`Version du ${dateStr} restaurée !\nVotre application sera mise à jour d'ici 30 à 60 secondes.`, "success");
                 chargerHistorique(); // On rafraîchit la liste pour voir le nouveau commit de restauration
             } else {
-                afficherMessage(
-                    `⚠️ Le commit de restauration ${shaCommit} a été créé, mais la vérification ` +
-                    "a échoué :\n\n" + detailVerif + "\n\nVérifie l'état du dépôt avant de continuer.",
-                    "error"
-                );
+                const errData = await reponsePut.json();
+                afficherMessage(`Échec de la restauration : ${errData.message || reponsePut.statusText}`, "error");
             }
         } catch (error) {
             afficherMessage(`Erreur pendant la restauration : ${error.message}`, "error");
@@ -1642,9 +1055,6 @@
 
     // Initialisation au chargement de la page
     rafraichirCiblesUI();
-    // Si les identifiants sont déjà mémorisés, on remplit la combo des dépôts
-    // en silence pour qu'elle soit prête sans action de ta part.
-    chargerListeDepots(true);
 </script>
 
 </body>
