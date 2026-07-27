@@ -787,6 +787,54 @@
         return decodeURIComponent(escape(atob(b64.replace(/\n/g, ''))));
     }
 
+    // Copie de texte robuste. Essaie d'abord l'API moderne ; si elle échoue
+    // (fréquent sur iOS Safari, où navigator.clipboard existe mais rejette),
+    // bascule sur un repli execCommand avec sélection par Range, seule méthode
+    // fiable sur iPhone. Renvoie true si la copie a réussi.
+    async function copierTexte(texte) {
+        // 1) API moderne (contexte sécurisé + geste utilisateur)
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            try {
+                await navigator.clipboard.writeText(texte);
+                return true;
+            } catch (e) {
+                // On tente le repli ci-dessous plutôt que d'abandonner.
+            }
+        }
+
+        // 2) Repli compatible iOS
+        try {
+            const zone = document.createElement('textarea');
+            zone.value = texte;
+            zone.setAttribute('readonly', '');
+            zone.style.position = 'fixed';
+            zone.style.top = '0';
+            zone.style.left = '0';
+            zone.style.opacity = '0';
+            document.body.appendChild(zone);
+
+            const estIOS = /ipad|iphone|ipod/i.test(navigator.userAgent);
+            if (estIOS) {
+                // iOS ignore .select() : il faut une vraie sélection via Range.
+                const range = document.createRange();
+                range.selectNodeContents(zone);
+                const selection = window.getSelection();
+                selection.removeAllRanges();
+                selection.addRange(range);
+                zone.setSelectionRange(0, texte.length);
+            } else {
+                zone.focus();
+                zone.select();
+            }
+
+            const ok = document.execCommand('copy');
+            document.body.removeChild(zone);
+            return ok;
+        } catch (e) {
+            return false;
+        }
+    }
+
     function verifierConfig() {
         if(!config.user || !config.token) {
             afficherMessage("Erreur : Configure tes identifiants GitHub à l'étape 1 d'abord.", "error");
@@ -874,6 +922,44 @@
     }
 
     // ---------- HISTORIQUE & RESTAURATION ----------
+
+    // Copie dans le presse-papier l'URL GitHub Pages de l'appli sélectionnée.
+    // Cette adresse sert toujours le dernier index.html déployé : elle ouvre
+    // donc toujours la version la plus à jour de l'application.
+    async function copierUrlApp(bouton) {
+        const repo = document.getElementById('select-history-target').value;
+
+        if (!config.user) {
+            afficherMessage("Renseigne d'abord ton nom d'utilisateur GitHub à l'étape 1.", "error");
+            return;
+        }
+        if (!repo) {
+            afficherMessage("Ajoute et sélectionne une application cible à l'étape 2.", "error");
+            return;
+        }
+
+        // L'hôte github.io est en minuscules ; le nom du dépôt reste tel quel.
+        const url = `https://${config.user.toLowerCase()}.github.io/${repo}/`;
+
+        const ok = await copierTexte(url);
+        if (ok) {
+            // Retour visuel sur le bouton lui-même
+            if (bouton) {
+                const texteOrigine = bouton.textContent;
+                bouton.textContent = "Copié ✓";
+                setTimeout(() => { bouton.textContent = texteOrigine; }, 1500);
+            }
+            afficherMessage(`URL copiée : ${url}`, "success");
+        } else {
+            // Même si la copie automatique échoue, on affiche l'URL pour un
+            // copier-coller manuel (appui long sur le texte).
+            afficherMessage(
+                `Copie automatique impossible sur ce navigateur.\n\n` +
+                `Voici l'URL, à copier à la main :\n${url}`,
+                "error"
+            );
+        }
+    }
 
     async function chargerHistorique() {
         const repo = document.getElementById('select-history-target').value;
@@ -978,20 +1064,10 @@
             afficherMessage(`Récupération de la version du ${dateStr}...`, "success");
             const contenu = await recupererContenuVersion(repo, commitSha);
 
-            // Méthode moderne (nécessite HTTPS, ce qui est le cas sur github.io / Pages)
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                await navigator.clipboard.writeText(contenu);
-            } else {
-                // Repli pour les contextes non sécurisés
-                const zone = document.createElement('textarea');
-                zone.value = contenu;
-                zone.style.position = 'fixed';
-                zone.style.opacity = '0';
-                document.body.appendChild(zone);
-                zone.focus();
-                zone.select();
-                document.execCommand('copy');
-                document.body.removeChild(zone);
+            const ok = await copierTexte(contenu);
+            if (!ok) {
+                afficherMessage(`Copie automatique impossible sur ce navigateur pour la version du ${dateStr}. Utilise « Voir » puis copie depuis l'onglet ouvert.`, "error");
+                return;
             }
 
             // Retour visuel sur le bouton lui-même
