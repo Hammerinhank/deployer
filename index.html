@@ -1903,16 +1903,45 @@
         }, ms || 2000);
     }
 
+    // Construit l'URL GitHub Pages « attendue » d'un dépôt (repli si l'API ne
+    // renvoie pas d'adresse). Cas particulier : le dépôt « <user>.github.io »
+    // est un SITE UTILISATEUR, servi à la racine (sans le segment /repo/).
+    function urlPagesDevinee(repo) {
+        const user = config.user.toLowerCase();
+        if (repo.toLowerCase() === `${user}.github.io`) return `https://${user}.github.io/`;
+        return `https://${user}.github.io/${repo}/`;
+    }
+
+    // Interroge l'API Pages du dépôt. Renvoie { html_url, status } si Pages est
+    // configuré, null si 404 (= Pages non activé), et lève pour les autres cas
+    // (droits insuffisants, réseau…). html_url est l'adresse FAISANT AUTORITÉ
+    // (gère site projet / site utilisateur / domaine personnalisé).
+    async function lireInfosPages(repo) {
+        const url = `https://api.github.com/repos/${config.user}/${repo}/pages`;
+        const r = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
+        if (r.status === 404) return null;
+        if (!r.ok) {
+            let detail = `${r.status} ${r.statusText}`;
+            try { const e = await r.json(); if (e && e.message) detail = e.message; } catch (_) {}
+            throw new Error(detail);
+        }
+        const d = await r.json();
+        return { html_url: d.html_url || null, status: d.status || null };
+    }
+
     // Affiche (ou efface) sous le bouton une ligne avec l'URL en lien cliquable,
     // pour pouvoir l'ouvrir et vérifier que l'appli se lance bien.
-    function afficherLigneUrlAppli(url) {
+    // statut : 'building' => on prévient que la publication prend 1–2 min.
+    function afficherLigneUrlAppli(url, statut) {
         const ligne = document.getElementById('url-appli-ligne');
         if (!ligne) return;
         ligne.innerHTML = "";
         if (!url) return; // Appel sans URL = on efface la ligne
         const label = document.createElement('div');
         label.className = 'url-label';
-        label.textContent = "Clique pour vérifier que l'appli se lance :";
+        label.textContent = (statut === 'building')
+            ? "Publication en cours (patiente 1–2 min), puis clique pour vérifier :"
+            : "Clique pour vérifier que l'appli se lance :";
         const lien = document.createElement('a');
         lien.className = 'url-lien';
         lien.href = url;
@@ -1923,9 +1952,88 @@
         ligne.appendChild(lien);
     }
 
+    // Variante affichée quand Pages n'est PAS activé : on montre l'URL (barrée
+    // d'un avertissement) et un bouton pour activer Pages en un clic.
+    function afficherLigneUrlAppliInactive(repo, url) {
+        const ligne = document.getElementById('url-appli-ligne');
+        if (!ligne) return;
+        ligne.innerHTML = "";
+        const label = document.createElement('div');
+        label.className = 'url-label';
+        label.textContent = "⚠️ GitHub Pages n'est pas activé — cette adresse renvoie un 404 :";
+        const lien = document.createElement('a');
+        lien.className = 'url-lien';
+        lien.href = url;
+        lien.target = '_blank';
+        lien.rel = 'noopener';
+        lien.textContent = url;
+        const btn = document.createElement('button');
+        btn.className = 'btn';
+        btn.style.backgroundColor = '#5856d6';
+        btn.style.marginTop = '10px';
+        btn.textContent = "Activer GitHub Pages pour cette appli";
+        btn.addEventListener('click', () => activerPagesAppli(repo, btn));
+        ligne.appendChild(label);
+        ligne.appendChild(lien);
+        ligne.appendChild(btn);
+    }
+
+    // Active GitHub Pages sur un dépôt existant (branche par défaut, dossier /),
+    // exactement comme le fait la création de dépôt. C'est ce qui rend l'URL
+    // github.io fonctionnelle pour une appli dont le dépôt a été créé sans Pages.
+    async function activerPagesAppli(repo, bouton) {
+        if (!verifierConfig()) return;
+        const origine = bouton ? bouton.textContent : null;
+        if (bouton) { bouton.disabled = true; bouton.textContent = "Activation…"; }
+        try {
+            // On active Pages sur la branche par défaut du dépôt (là où Le
+            // Déployeur écrit index.html), dossier racine.
+            let branche = "main";
+            try {
+                const rr = await fetch(`https://api.github.com/repos/${config.user}/${repo}`, { headers: headersGitHub(), cache: "no-store" });
+                if (rr.ok) { const dd = await rr.json(); branche = dd.default_branch || "main"; }
+            } catch (_) {}
+
+            const resp = await fetch(`https://api.github.com/repos/${config.user}/${repo}/pages`, {
+                method: "POST",
+                headers: { "Authorization": `token ${config.token}`, "Accept": "application/vnd.github+json" },
+                body: JSON.stringify({ source: { branch: branche, path: "/" } })
+            });
+
+            if (resp.ok || resp.status === 409) { // 409 = déjà activé
+                let urlPages = urlPagesDevinee(repo);
+                if (resp.ok) { try { const pd = await resp.json(); if (pd.html_url) urlPages = pd.html_url; } catch (_) {} }
+                if (bouton) { bouton.textContent = "Activé ✓"; setTimeout(() => { bouton.textContent = origine; bouton.disabled = false; }, 2000); }
+                afficherLigneUrlAppli(urlPages, "building");
+                afficherMessage(
+                    `✅ GitHub Pages activé pour « ${repo} » (branche ${branche}, dossier /).\n\n` +
+                    `Adresse : ${urlPages}\n\n` +
+                    "La toute première publication prend souvent 1 à 2 minutes : réessaie le lien juste après.",
+                    "success"
+                );
+            } else {
+                if (bouton) { bouton.textContent = origine; bouton.disabled = false; }
+                const e = await resp.json().catch(() => ({}));
+                afficherMessage(
+                    `Impossible d'activer Pages : ${e.message || resp.statusText}.\n\n` +
+                    "Ton token doit pouvoir administrer le dépôt (portée repo en token classique, ou " +
+                    "permissions Pages + Administration en écriture en fine-grained). Sinon, active-le à " +
+                    "la main dans Settings > Pages du dépôt (branche par défaut, dossier /).",
+                    "error"
+                );
+            }
+        } catch (err) {
+            if (bouton) { bouton.textContent = origine; bouton.disabled = false; }
+            afficherMessage(`Erreur pendant l'activation de Pages : ${err.message}`, "error");
+        }
+    }
+
     // Copie l'URL GitHub Pages de l'application sélectionnée à l'étape 4.
-    // Cette URL (https://<user>.github.io/<repo>/) sert TOUJOURS la dernière
-    // version déployée : pas de numéro de commit, donc toujours à jour.
+    // AVANT de copier, on VÉRIFIE que Pages est bien publié pour ce dépôt :
+    // le bouton « Voir » lit directement index.html (il marche donc même sans
+    // Pages), alors que cette URL n'existe que si Pages est activé — d'où le 404
+    // possible sur certaines applis. On utilise l'adresse renvoyée par l'API
+    // (faisant autorité), et on propose d'activer Pages si ce n'est pas fait.
     async function copierUrlAppli(bouton) {
         if (!verifierConfig()) return;
         const repo = document.getElementById('select-history-target').value;
@@ -1933,20 +2041,54 @@
             afficherMessage("Ajoute et sélectionne une application à l'étape 2 d'abord.", "error");
             return;
         }
-        // Le sous-domaine github.io est toujours en minuscules.
-        const url = `https://${config.user.toLowerCase()}.github.io/${repo}/`;
 
-        // Dans tous les cas, on affiche la ligne cliquable (utile même si la
-        // copie presse-papier échoue).
-        afficherLigneUrlAppli(url);
+        const origine = bouton ? bouton.textContent : null;
+        if (bouton) { bouton.disabled = true; bouton.textContent = "Vérification…"; }
 
+        let url = urlPagesDevinee(repo);
+        let pagesActif = false, statut = null, erreurVerif = null;
+        try {
+            const infos = await lireInfosPages(repo);
+            if (infos) { pagesActif = true; if (infos.html_url) url = infos.html_url; statut = infos.status; }
+        } catch (e) { erreurVerif = e.message; }
+
+        if (bouton) { bouton.disabled = false; bouton.textContent = origine; }
+
+        // Cas 1 : Pages n'est PAS activé (404 confirmé). On ne copie pas une URL
+        // trompeuse : on explique et on propose de l'activer.
+        if (!pagesActif && !erreurVerif) {
+            afficherLigneUrlAppliInactive(repo, url);
+            afficherMessage(
+                `⚠️ GitHub Pages n'est pas activé pour « ${repo} », donc l'adresse\n${url}\n` +
+                "renvoie « There isn't a GitHub Pages site here » (404).\n\n" +
+                "C'est pour ça que « Voir » marche mais pas l'URL : « Voir » lit directement le " +
+                "fichier index.html, sans passer par Pages.\n\n" +
+                "Clique sur « Activer GitHub Pages pour cette appli » (juste au-dessus) pour publier " +
+                "le site. Après 1 à 2 minutes, l'URL lancera bien l'appli.",
+                "error"
+            );
+            return;
+        }
+
+        // Cas 2 : on n'a pas pu vérifier (droits sur l'API Pages, réseau…). On
+        // copie l'URL devinée en prévenant.
+        if (erreurVerif) {
+            afficherLigneUrlAppli(url, statut);
+            const ok = await copierTexte(url);
+            afficherMessage(
+                `URL affichée${ok ? " et copiée" : ""}, mais je n'ai pas pu vérifier l'état de Pages ` +
+                `(${erreurVerif}).\nSi le lien renvoie un 404, c'est que Pages n'est pas activé pour ce dépôt.`,
+                "error"
+            );
+            return;
+        }
+
+        // Cas 3 : Pages actif → URL réelle affichée + copiée, retour sur le bouton.
+        afficherLigneUrlAppli(url, statut);
         const ok = await copierTexte(url);
         if (ok) {
-            // Succès : simple retour « Copié ✓ » sur le bouton pendant 2 s.
-            // On n'affiche PAS le message du bas et on ne fait donc pas défiler.
             feedbackBouton(bouton, "Copié ✓", 2000);
         } else {
-            // Échec seulement : on affiche l'URL en bas pour un copier-coller manuel.
             afficherMessage(
                 "Le presse-papier n'a pas pu être utilisé sur cet appareil.\n\n" +
                 "Voici l'URL à copier à la main (elle ouvre toujours la dernière version) :\n\n" +
