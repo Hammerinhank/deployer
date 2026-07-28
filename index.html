@@ -372,9 +372,9 @@
                 <label for="sync-file">Nom du fichier</label>
                 <input type="text" id="sync-file" placeholder="cibles.json" value="cibles.json">
 
-                <button class="btn" onclick="enregistrerConfigSync()" style="background-color: #5856d6;">Enregistrer ce réglage de synchro</button>
-                <button class="btn" onclick="envoyerCiblesManuel()" style="background-color: #6e6e73; margin-top: 10px;">⬆️ Envoyer les cibles vers GitHub</button>
-                <button class="btn" onclick="recupererCiblesManuel()" style="background-color: #6e6e73; margin-top: 10px;">⬇️ Récupérer les cibles depuis GitHub</button>
+                <button class="btn" onclick="enregistrerConfigSync(this)" style="background-color: #5856d6;">Enregistrer ce réglage de synchro</button>
+                <button class="btn" onclick="envoyerCiblesManuel(this)" style="background-color: #6e6e73; margin-top: 10px;">⬆️ Envoyer les cibles vers GitHub</button>
+                <button class="btn" onclick="recupererCiblesManuel(this)" style="background-color: #6e6e73; margin-top: 10px;">⬇️ Récupérer les cibles depuis GitHub</button>
             </div>
         </details>
     </div>
@@ -1214,48 +1214,81 @@
         }
     }
 
-    // Enregistre le réglage de synchro (dépôt + fichier) puis tente une première
-    // réconciliation.
-    function enregistrerConfigSync() {
+    // Petit utilitaire : exécute une tâche asynchrone en donnant un retour visuel
+    // SUR LE BOUTON — libellé « en cours » pendant l'exécution, puis « fait ✓ »
+    // pendant 2 s, avant de restaurer le libellé d'origine. Le bouton est
+    // désactivé le temps de la tâche. La tâche doit renvoyer false (ou lever une
+    // erreur) pour signaler un échec : dans ce cas on restaure aussitôt le
+    // libellé (les messages d'erreur détaillés sont gérés dans la tâche).
+    async function boutonTache(bouton, libellePendant, libelleFait, tache) {
+        const origine = bouton ? bouton.textContent : null;
+        if (bouton) { bouton.disabled = true; bouton.textContent = libellePendant; }
+        let ok = false;
+        try { ok = (await tache()) !== false; }
+        catch (_) { ok = false; }
+        if (bouton) {
+            if (ok) {
+                bouton.textContent = libelleFait;
+                setTimeout(() => { bouton.textContent = origine; bouton.disabled = false; }, 2000);
+            } else {
+                bouton.textContent = origine;
+                bouton.disabled = false;
+            }
+        }
+        return ok;
+    }
+
+    // Enregistre le réglage de synchro (dépôt + fichier) puis lance une première
+    // réconciliation. Tout le retour se fait sur le bouton, pour ne PAS laisser
+    // traîner un message « en cours » quand il n'y a rien à réconcilier.
+    async function enregistrerConfigSync(bouton) {
         const repo = document.getElementById('sync-repo').value.trim();
         const chemin = document.getElementById('sync-file').value.trim() || 'cibles.json';
         localStorage.setItem('deployer_sync', JSON.stringify({ repo: repo, chemin: chemin }));
-        if (repo) {
-            afficherMessage(`Synchronisation réglée sur ${repo}/${chemin}. Réconciliation en cours…`, "success");
-            synchroniserAuDemarrage();
-        } else {
-            afficherMessage("Synchronisation désactivée (aucun dépôt indiqué). Les cibles restent en local uniquement.", "success");
+
+        if (!repo) {
+            // Synchro désactivée : retour bref sur le bouton, aucun message qui traîne.
+            feedbackBouton(bouton, "Synchro désactivée", 2000);
+            return;
         }
+
+        // synchroniserAuDemarrage gère elle-même ses éventuels messages (récupéré /
+        // mis à jour / erreur) ; ici on assure juste le retour « en cours » → « ✓ ».
+        await boutonTache(bouton, "Réconciliation…", "Réglage enregistré ✓", async () => {
+            await synchroniserAuDemarrage();
+            return true;
+        });
     }
 
     // Bouton « Envoyer » : force l'écriture de la copie locale vers GitHub.
-    async function envoyerCiblesManuel() {
+    async function envoyerCiblesManuel(bouton) {
         if (!verifierConfig()) return;
         if (!syncConfiguree()) { afficherMessage("Règle d'abord un dépôt de synchronisation à l'étape 5.", "error"); return; }
-        afficherMessage("Envoi des cibles vers GitHub…", "success");
-        const ok = await pousserCiblesVersGithub();
-        afficherMessage(
-            ok ? `✅ ${cibles.length} cible(s) enregistrée(s) sur GitHub.`
-               : "Échec de l'envoi vers GitHub. Vérifie le dépôt de synchro et les droits du token.",
-            ok ? "success" : "error"
-        );
+        await boutonTache(bouton, "Envoi…", "Envoyé ✓", async () => {
+            const ok = await pousserCiblesVersGithub();
+            if (!ok) afficherMessage("Échec de l'envoi vers GitHub. Vérifie le dépôt de synchro et les droits du token.", "error");
+            return ok;
+        });
     }
 
     // Bouton « Récupérer » : force l'adoption de la copie GitHub en local.
-    async function recupererCiblesManuel() {
+    async function recupererCiblesManuel(bouton) {
         if (!verifierConfig()) return;
         if (!syncConfiguree()) { afficherMessage("Règle d'abord un dépôt de synchronisation à l'étape 5.", "error"); return; }
-        try {
-            const distant = await lireCiblesDistantes();
-            if (!distant) { afficherMessage("Aucun fichier de cibles trouvé sur GitHub pour l'instant.", "error"); return; }
-            cibles = distant.cibles;
-            ciblesMaj = distant.maj || new Date().toISOString();
-            localStorage.setItem('deployer_cibles', JSON.stringify({ cibles: cibles, maj: ciblesMaj }));
-            rafraichirCiblesUI();
-            afficherMessage(`✅ ${cibles.length} cible(s) récupérée(s) depuis GitHub.`, "success");
-        } catch (e) {
-            afficherMessage(`Échec de la récupération : ${e.message}`, "error");
-        }
+        await boutonTache(bouton, "Récupération…", "Récupéré ✓", async () => {
+            try {
+                const distant = await lireCiblesDistantes();
+                if (!distant) { afficherMessage("Aucun fichier de cibles trouvé sur GitHub pour l'instant.", "error"); return false; }
+                cibles = distant.cibles;
+                ciblesMaj = distant.maj || new Date().toISOString();
+                localStorage.setItem('deployer_cibles', JSON.stringify({ cibles: cibles, maj: ciblesMaj }));
+                rafraichirCiblesUI();
+                return true;
+            } catch (e) {
+                afficherMessage(`Échec de la récupération : ${e.message}`, "error");
+                return false;
+            }
+        });
     }
 
     // Pré-remplit les champs de l'étape 5 à partir du réglage enregistré.
