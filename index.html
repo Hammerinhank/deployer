@@ -1516,6 +1516,47 @@
 
     // ---------- DÉPLOIEMENT ----------
 
+    // Relit index.html en ligne et le compare, exactement, au code envoyé.
+    // Juste après une écriture, l'API GitHub peut renvoyer une version encore en
+    // cache ou pas encore propagée (contenu plus court → « ne correspond pas »),
+    // alors que le déploiement a en réalité réussi. Pour éviter cette fausse
+    // alerte, on :
+    //   1) relit au COMMIT PRÉCIS qu'on vient de créer (?ref=SHA), déterministe ;
+    //   2) RÉESSAIE plusieurs fois avec un délai croissant avant de renoncer.
+    // Renvoie { ok, detail } — ok=true dès qu'une relecture correspond.
+    async function verifierContenuEnLigne(urlBase, code, shaCommitComplet, onProgres) {
+        const refQuery = shaCommitComplet ? `?ref=${shaCommitComplet}` : "";
+        // Délais (ms) AVANT chaque tentative. La 1re est immédiate ; les suivantes
+        // laissent à GitHub le temps de propager (total ~14 s au pire).
+        const delais = [0, 1500, 2500, 4000, 6000];
+        let dernierDetail = "";
+        for (let i = 0; i < delais.length; i++) {
+            if (i > 0) {
+                if (onProgres) onProgres(i + 1, delais.length);
+                await new Promise(r => setTimeout(r, delais[i]));
+            }
+            try {
+                const relecture = await fetch(urlBase + refQuery, { headers: headersGitHub(), cache: "no-store" });
+                if (relecture.ok) {
+                    const donnees = await relecture.json();
+                    const contenuEnLigne = decoderBase64(donnees.content);
+                    if (contenuEnLigne === code) {
+                        return { ok: true, detail: "" };
+                    }
+                    dernierDetail =
+                        `Le contenu en ligne fait ${contenuEnLigne.length} caractères, ` +
+                        `alors que tu en as envoyé ${code.length}. Ils ne correspondent pas ` +
+                        `(vérifié ${delais.length} fois).`;
+                } else {
+                    dernierDetail = `Relecture impossible (${relecture.status} ${relecture.statusText}).`;
+                }
+            } catch (e) {
+                dernierDetail = "Relecture impossible : " + e.message;
+            }
+        }
+        return { ok: false, detail: dernierDetail };
+    }
+
     async function deployerCode() {
         const repo = document.getElementById('select-target').value;
         const code = document.getElementById('html-code').value;
@@ -1613,8 +1654,8 @@
             // C'est exactement le piège qui t'a joué des tours : succès annoncé,
             // aucun changement à l'écran. On vérifie donc TOUT avant de fêter ça.
             const resultat = await reponsePut.json();
-            const shaCommit = (resultat.commit && resultat.commit.sha)
-                ? resultat.commit.sha.substring(0, 7) : "inconnu";
+            const shaCommitComplet = (resultat.commit && resultat.commit.sha) ? resultat.commit.sha : null;
+            const shaCommit = shaCommitComplet ? shaCommitComplet.substring(0, 7) : "inconnu";
             const cheminEcrit = (resultat.content && resultat.content.path)
                 ? resultat.content.path : "index.html";
 
@@ -1640,28 +1681,21 @@
             // ---- VÉRIFICATION 2 : relecture + comparaison caractère par caractère ----
             // On relit le fichier réellement en ligne et on compare, exactement,
             // avec ce que tu viens d'envoyer. C'est LA preuve que ça a marché.
+            // IMPORTANT : juste après l'écriture, l'API GitHub peut encore renvoyer
+            // une version en cache (contenu plus court, « ne correspond pas »). On
+            // relit donc au commit PRÉCIS qu'on vient de créer et on RÉESSAIE
+            // plusieurs fois avec un délai croissant avant de conclure à un échec.
             afficherMessage(`Commit ${shaCommit} créé. Vérification du contenu réellement en ligne...`, "success");
 
-            let verifOk = false;
-            let detailVerif = "";
-            try {
-                const relecture = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
-                if (relecture.ok) {
-                    const donneesRelues = await relecture.json();
-                    const contenuEnLigne = decoderBase64(donneesRelues.content);
-                    if (contenuEnLigne === code) {
-                        verifOk = true;
-                    } else {
-                        detailVerif =
-                            `Le contenu en ligne fait ${contenuEnLigne.length} caractères, ` +
-                            `alors que tu en as envoyé ${code.length}. Ils ne correspondent pas.`;
-                    }
-                } else {
-                    detailVerif = `Relecture impossible (${relecture.status} ${relecture.statusText}).`;
-                }
-            } catch (e) {
-                detailVerif = "Relecture impossible : " + e.message;
-            }
+            const verif = await verifierContenuEnLigne(url, code, shaCommitComplet, (n, total) => {
+                afficherMessage(
+                    `Commit ${shaCommit} créé. GitHub n'a pas encore propagé le fichier — ` +
+                    `nouvelle vérification… (tentative ${n}/${total})`,
+                    "success"
+                );
+            });
+            const verifOk = verif.ok;
+            const detailVerif = verif.detail;
 
             // ---- VÉRIFICATION 3 : reste-t-il des fichiers en double (casse) ? ----
             // Même si l'écriture a réussi cette fois, un doublon qui traîne fera
@@ -2142,8 +2176,8 @@
             // Même logique de vérification que pour un déploiement : on confirme
             // que le fichier réellement en ligne = l'ancien contenu qu'on restaure.
             const resultat = await reponsePut.json();
-            const shaCommit = (resultat.commit && resultat.commit.sha)
-                ? resultat.commit.sha.substring(0, 7) : "inconnu";
+            const shaCommitComplet = (resultat.commit && resultat.commit.sha) ? resultat.commit.sha : null;
+            const shaCommit = shaCommitComplet ? shaCommitComplet.substring(0, 7) : "inconnu";
             const cheminEcrit = (resultat.content && resultat.content.path)
                 ? resultat.content.path : "index.html";
 
@@ -2158,23 +2192,16 @@
                 return;
             }
 
-            let verifOk = false;
-            let detailVerif = "";
-            try {
-                const relecture = await fetch(urlActuel, { headers: headersGitHub(), cache: "no-store" });
-                if (relecture.ok) {
-                    const relues = await relecture.json();
-                    if (decoderBase64(relues.content) === ancienContenu) {
-                        verifOk = true;
-                    } else {
-                        detailVerif = "Le contenu en ligne ne correspond pas à la version restaurée.";
-                    }
-                } else {
-                    detailVerif = `Relecture impossible (${relecture.status}).`;
-                }
-            } catch (e) {
-                detailVerif = "Relecture impossible : " + e.message;
-            }
+            afficherMessage(`Commit ${shaCommit} créé. Vérification de la version restaurée en ligne...`, "success");
+            const verif = await verifierContenuEnLigne(urlActuel, ancienContenu, shaCommitComplet, (n, total) => {
+                afficherMessage(
+                    `Commit ${shaCommit} créé. GitHub n'a pas encore propagé le fichier — ` +
+                    `nouvelle vérification… (tentative ${n}/${total})`,
+                    "success"
+                );
+            });
+            const verifOk = verif.ok;
+            const detailVerif = verif.detail;
 
             if (verifOk) {
                 afficherMessage(
