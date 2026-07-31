@@ -73,6 +73,11 @@
             background-color: #fbfbfd;
         }
         textarea { font-family: monospace; height: 180px; resize: vertical; }
+        /* Surlignage quand on glisse un fichier au-dessus de la zone de code */
+        #html-code.drop-actif {
+            border: 2px dashed #5856d6;
+            background: #f0f0ff;
+        }
         .btn {
             background-color: #0071e3;
             color: white;
@@ -342,8 +347,8 @@
         <label for="select-target">Choisir l'application à mettre à jour</label>
         <select id="select-target"></select>
 
-        <label for="html-code">Colle le nouveau code HTML ici</label>
-        <textarea id="html-code" placeholder="<!DOCTYPE html>..."></textarea>
+        <label for="html-code">Colle le nouveau code HTML ici <span style="font-weight:400; color:#86868b;">— ou glisse un fichier .html dessus</span></label>
+        <textarea id="html-code" placeholder="Colle ton code, ou glisse-dépose un fichier .html ici…"></textarea>
 
         <label for="commit-comment">Commentaire de version (obligatoire)</label>
         <input type="text" id="commit-comment" placeholder="Ex : Ajout du bouton de partage">
@@ -2222,6 +2227,64 @@
         }
     }
 
+    // Permet de glisser-déposer un fichier .html directement sur la zone de code
+    // (fonctionne sur l'iMac ; le drag & drop de fichiers n'existe pas sur iPhone).
+    function initGlisserDeposerHtml() {
+        const zone = document.getElementById('html-code');
+        if (!zone) return;
+
+        const contientFichier = (e) => e.dataTransfer && e.dataTransfer.types &&
+            Array.prototype.indexOf.call(e.dataTransfer.types, 'Files') !== -1;
+
+        // Filet de sécurité : si un fichier est lâché À CÔTÉ de la zone, on empêche
+        // le navigateur de l'ouvrir (ce qui ferait quitter la page et perdre ton
+        // travail). On ne bloque que les glissers de FICHIERS, hors de la zone.
+        ['dragover', 'drop'].forEach(ev => {
+            document.addEventListener(ev, (e) => {
+                if (contientFichier(e) && e.target !== zone) e.preventDefault();
+            });
+        });
+
+        zone.addEventListener('dragenter', (e) => {
+            if (!contientFichier(e)) return;
+            e.preventDefault();
+            zone.classList.add('drop-actif');
+        });
+        zone.addEventListener('dragover', (e) => {
+            if (!contientFichier(e)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            zone.classList.add('drop-actif');
+        });
+        zone.addEventListener('dragleave', (e) => {
+            if (e.target === zone) zone.classList.remove('drop-actif');
+        });
+        zone.addEventListener('drop', (e) => {
+            if (!contientFichier(e)) return; // On laisse le drop de texte normal se faire
+            e.preventDefault();
+            zone.classList.remove('drop-actif');
+
+            const fichier = e.dataTransfer.files[0];
+            if (!fichier) return;
+
+            const nom = (fichier.name || '').toLowerCase();
+            const estHtml = nom.endsWith('.html') || nom.endsWith('.htm') || fichier.type === 'text/html';
+
+            const lecteur = new FileReader();
+            lecteur.onload = () => {
+                zone.value = lecteur.result;
+                afficherMessage(
+                    `Fichier « ${fichier.name} » chargé dans la zone de code` +
+                    (estHtml ? "" : " ⚠️ (son extension n'est pas .html — vérifie que c'est bien du HTML)") +
+                    ".\n\nN'oublie pas le commentaire de version, puis « Mettre à jour sur GitHub ».",
+                    estHtml ? "success" : "error"
+                );
+            };
+            lecteur.onerror = () => afficherMessage(`Impossible de lire le fichier « ${fichier.name} ».`, "error");
+            lecteur.readAsText(fichier);
+        });
+    }
+
     // Initialisation au chargement de la page
     rafraichirCiblesUI();
     // Si les identifiants sont déjà mémorisés, on remplit la combo des dépôts
@@ -2231,6 +2294,8 @@
     // liste locale avec la copie GitHub (si un dépôt de synchro est configuré).
     initSyncUI();
     synchroniserAuDemarrage();
+    // Glisser-déposer d'un fichier .html sur la zone de code (étape 3).
+    initGlisserDeposerHtml();
 </script>
 
 </body>
