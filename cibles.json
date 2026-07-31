@@ -27,7 +27,11 @@
     {
       "name": "vignettes",
       "repo": "vignettes"
+    },
+    {
+      "name": "creerAlbumPhoto",
+      "repo": "creerAlbumPhoto"
     }
   ],
-  "maj": "2026-07-31T08:09:10.810Z"
+  "maj": "2026-07-31T15:24:05.669Z"
 }
