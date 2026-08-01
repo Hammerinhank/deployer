@@ -331,7 +331,7 @@
                 <hr style="border: 0; border-top: 1px solid #e5e5ea; margin: 22px 0;">
                 <button class="btn" onclick="verifierSecurite()" id="btn-security-check" style="background-color: #ff3b30;">🛡️ Security check (tokens en dur)</button>
                 <p style="font-size: 12px; color: #86868b; margin: 6px 0 0 0;">
-                    Analyse tous les fichiers .html de <strong>tous</strong> tes dépôts GitHub, sur
+                    Analyse tous les fichiers .html et .py de <strong>tous</strong> tes dépôts GitHub, sur
                     leurs commits récents (jusqu'à 30 par fichier), à la recherche de tokens ou
                     secrets câblés en dur. Peut prendre plusieurs minutes et consommer beaucoup
                     d'appels API selon le nombre de dépôts. Des faux positifs sont possibles.
@@ -746,12 +746,15 @@
 
     // ================= SECURITY CHECK (tokens câblés en dur) =================
     // Objectif : parcourir TOUS les dépôts du compte, y trouver tous les
-    // fichiers .html, et pour chacun analyser ses commits récents à la
+    // fichiers .html et .py, et pour chacun analyser ses commits récents à la
     // recherche de tokens/secrets écrits en clair dans le code.
 
-    // Liste des fichiers .html d'un dépôt via l'arbre Git complet (recursive=1).
-    // Renvoie un tableau de chemins (ex: ["index.html", "assets/aide.html"]).
-    async function listerFichiersHtml(repo, branche) {
+    // Extensions de fichiers passées au crible par le Security check.
+    const EXTENSIONS_SECURITE = ['.html', '.py'];
+
+    // Liste des fichiers .html/.py d'un dépôt via l'arbre Git complet (recursive=1).
+    // Renvoie un tableau de chemins (ex: ["index.html", "scripts/deploy.py"]).
+    async function listerFichiersASurveiller(repo, branche) {
         const url = `https://api.github.com/repos/${config.user}/${repo}/git/trees/${encodeURIComponent(branche)}?recursive=1`;
         const rep = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
         if (!rep.ok) {
@@ -762,7 +765,7 @@
         const data = await rep.json();
         if (!Array.isArray(data.tree)) return { fichiers: [], tronque: false };
         const fichiers = data.tree
-            .filter(f => f.type === 'blob' && f.path.toLowerCase().endsWith('.html'))
+            .filter(f => f.type === 'blob' && EXTENSIONS_SECURITE.some(ext => f.path.toLowerCase().endsWith(ext)))
             .map(f => f.path);
         return { fichiers, tronque: !!data.truncated };
     }
@@ -811,7 +814,7 @@
             { nom: "Clé AWS Access Key ID", regex: /AKIA[0-9A-Z]{16}/g },
             { nom: "Clé privée (PEM)", regex: /-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/g },
             { nom: "Jeton JWT", regex: /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g },
-            { nom: "Variable sensible assignée en dur", regex: /(?:api[_-]?key|apikey|token|secret|passwd|password|access[_-]?key)\s*[:=]\s*["'`]([A-Za-z0-9\-_.]{12,})["'`]/gi }
+            { nom: "Variable sensible assignée en dur", regex: /(?:api[_-]?key|apikey|token|secret|passwd|password|access[_-]?key)[a-z0-9_]*\s*[:=]\s*["'`]([A-Za-z0-9\-_.]{12,})["'`]/gi }
         ];
 
         motifs.forEach(m => {
@@ -840,7 +843,7 @@
     // chaque trouvaille (dépôt, fichier, commit, motif, aperçu tronqué du secret).
     function afficherResultatSecurite(zone, trouvailles, stats) {
         let html = `<p style='font-size:13px; color:#86868b; margin-top:0;'>` +
-            `${stats.repos} dépôt(s), ${stats.fichiers} fichier(s) .html, ${stats.commits} commit(s) analysés.` +
+            `${stats.repos} dépôt(s), ${stats.fichiers} fichier(s) .html/.py, ${stats.commits} commit(s) analysés.` +
             (stats.tronques > 0 ? ` ⚠️ ${stats.tronques} dépôt(s) avaient un arbre de fichiers trop volumineux pour être listé entièrement.` : "") +
             `</p>`;
 
@@ -892,16 +895,16 @@
                     trouvailles
                 );
 
-                let fichiersHtml = [];
+                let fichiersASurveiller = [];
                 try {
-                    const resultatArbre = await listerFichiersHtml(repo.name, repo.default_branch || 'main');
-                    fichiersHtml = resultatArbre.fichiers;
+                    const resultatArbre = await listerFichiersASurveiller(repo.name, repo.default_branch || 'main');
+                    fichiersASurveiller = resultatArbre.fichiers;
                     if (resultatArbre.tronque) stats.tronques++;
                 } catch (_) {
                     continue; // Dépôt vide, inaccessible, ou branche inattendue : on passe au suivant
                 }
 
-                for (const chemin of fichiersHtml) {
+                for (const chemin of fichiersASurveiller) {
                     stats.fichiers++;
 
                     let commits = [];
@@ -961,7 +964,7 @@
             );
         } else {
             afficherMessage(
-                `✅ Security check terminé : aucun token détecté (${stats.fichiers} fichier(s) .html, ` +
+                `✅ Security check terminé : aucun token détecté (${stats.fichiers} fichier(s) .html/.py, ` +
                 `${stats.commits} commit(s), ${stats.repos} dépôt(s) analysés).`,
                 "success"
             );
