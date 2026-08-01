@@ -212,6 +212,32 @@
         .btn-restore { background-color: #ff9500; color: white; }
         .btn-restore:active { background-color: #c93400; }
 
+        /* Styles des résultats du Security check */
+        .security-item {
+            background: #fff5f5;
+            border: 1px solid #ffcdd2;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
+        .security-repo { font-weight: 700; color: #1d1d1f; word-break: break-word; }
+        .security-detail { color: #86868b; font-size: 12px; margin-top: 2px; }
+        .security-motif { color: #c62828; margin-top: 6px; word-break: break-all; }
+        .security-motif code {
+            background: #ffe0e0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .security-lien {
+            display: inline-block;
+            margin-top: 8px;
+            color: #0071e3;
+            font-size: 12px;
+            text-decoration: none;
+        }
+
         /* Styles de la liste des descriptifs */
         .descriptif-item {
             background: #f5f5f7;
@@ -301,6 +327,16 @@
                 <button class="btn" onclick="ouvrirDepotsGithub()" style="background-color: #6e6e73; margin-top: 10px;">📂 Voir mes dépôts GitHub</button>
                 <button class="btn" onclick="chargerDescriptifs()" style="background-color: #5856d6; margin-top: 10px;">📝 Liste des descriptifs</button>
                 <div id="descriptifs-list" style="margin-top: 15px;"></div>
+
+                <hr style="border: 0; border-top: 1px solid #e5e5ea; margin: 22px 0;">
+                <button class="btn" onclick="verifierSecurite()" id="btn-security-check" style="background-color: #ff3b30;">🛡️ Security check (tokens en dur)</button>
+                <p style="font-size: 12px; color: #86868b; margin: 6px 0 0 0;">
+                    Analyse tous les fichiers .html de <strong>tous</strong> tes dépôts GitHub, sur
+                    leurs commits récents (jusqu'à 30 par fichier), à la recherche de tokens ou
+                    secrets câblés en dur. Peut prendre plusieurs minutes et consommer beaucoup
+                    d'appels API selon le nombre de dépôts. Des faux positifs sont possibles.
+                </p>
+                <div id="security-list" style="margin-top: 15px;"></div>
             </div>
         </details>
     </div>
@@ -705,6 +741,230 @@
         } catch (error) {
             afficherMessage(`Erreur réseau : ${error.message}`, "error");
             return false;
+        }
+    }
+
+    // ================= SECURITY CHECK (tokens câblés en dur) =================
+    // Objectif : parcourir TOUS les dépôts du compte, y trouver tous les
+    // fichiers .html, et pour chacun analyser ses commits récents à la
+    // recherche de tokens/secrets écrits en clair dans le code.
+
+    // Liste des fichiers .html d'un dépôt via l'arbre Git complet (recursive=1).
+    // Renvoie un tableau de chemins (ex: ["index.html", "assets/aide.html"]).
+    async function listerFichiersHtml(repo, branche) {
+        const url = `https://api.github.com/repos/${config.user}/${repo}/git/trees/${encodeURIComponent(branche)}?recursive=1`;
+        const rep = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
+        if (!rep.ok) {
+            let detail = `${rep.status} ${rep.statusText}`;
+            try { const e = await rep.json(); if (e && e.message) detail = e.message; } catch (_) {}
+            throw new Error(detail);
+        }
+        const data = await rep.json();
+        if (!Array.isArray(data.tree)) return { fichiers: [], tronque: false };
+        const fichiers = data.tree
+            .filter(f => f.type === 'blob' && f.path.toLowerCase().endsWith('.html'))
+            .map(f => f.path);
+        return { fichiers, tronque: !!data.truncated };
+    }
+
+    // Historique des commits ayant touché un fichier donné (limité à `limite`).
+    async function recupererCommitsFichier(repo, chemin, limite) {
+        const url = `https://api.github.com/repos/${config.user}/${repo}/commits?path=${encodeURIComponent(chemin)}&per_page=${limite}`;
+        const rep = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
+        if (!rep.ok) {
+            let detail = `${rep.status} ${rep.statusText}`;
+            try { const e = await rep.json(); if (e && e.message) detail = e.message; } catch (_) {}
+            throw new Error(detail);
+        }
+        return await rep.json();
+    }
+
+    // Contenu d'un fichier à un commit précis (chemin encodé segment par segment).
+    async function recupererContenuFichierRef(repo, chemin, ref) {
+        const url = `https://api.github.com/repos/${config.user}/${repo}/contents/${encoderCheminAPI(chemin)}?ref=${ref}`;
+        const rep = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
+        if (!rep.ok) {
+            let detail = `${rep.status} ${rep.statusText}`;
+            try { const e = await rep.json(); if (e && e.message) detail = e.message; } catch (_) {}
+            throw new Error(detail);
+        }
+        const data = await rep.json();
+        if (!data.content) return ""; // Peut être un type de fichier inattendu
+        return decoderBase64(data.content);
+    }
+
+    // Raccourcit une valeur sensible pour l'affichage (jamais le secret complet).
+    function redigerValeur(valeur) {
+        if (valeur.length <= 10) return valeur.slice(0, 2) + "…" + valeur.slice(-2);
+        return valeur.slice(0, 6) + "…" + valeur.slice(-4);
+    }
+
+    // Recherche, dans un contenu texte, des motifs correspondant à des tokens ou
+    // secrets connus. Renvoie un tableau de { nom, apercu } (apercu = tronqué).
+    function scannerContenuPourSecrets(contenu) {
+        if (!contenu) return [];
+        const trouvailles = [];
+        const motifs = [
+            { nom: "Token GitHub classique (ghp_)", regex: /ghp_[A-Za-z0-9]{36}/g },
+            { nom: "Token GitHub fine-grained", regex: /github_pat_[A-Za-z0-9_]{20,}/g },
+            { nom: "Token GitHub (gho_/ghu_/ghs_/ghr_)", regex: /gh[oesru]_[A-Za-z0-9]{36,}/g },
+            { nom: "Clé AWS Access Key ID", regex: /AKIA[0-9A-Z]{16}/g },
+            { nom: "Clé privée (PEM)", regex: /-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/g },
+            { nom: "Jeton JWT", regex: /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g },
+            { nom: "Variable sensible assignée en dur", regex: /(?:api[_-]?key|apikey|token|secret|passwd|password|access[_-]?key)\s*[:=]\s*["'`]([A-Za-z0-9\-_.]{12,})["'`]/gi }
+        ];
+
+        motifs.forEach(m => {
+            m.regex.lastIndex = 0;
+            let match;
+            while ((match = m.regex.exec(contenu)) !== null) {
+                const valeur = match[1] || match[0];
+                trouvailles.push({ nom: m.nom, apercu: redigerValeur(valeur) });
+                if (m.regex.lastIndex === match.index) m.regex.lastIndex++; // garde-fou anti-boucle
+            }
+        });
+        return trouvailles;
+    }
+
+    // Affiche l'état d'avancement pendant l'analyse (progression + compteur de
+    // trouvailles déjà détectées, sans lister leur détail pour rester lisible).
+    function afficherProgressionSecurite(zone, texte, trouvailles) {
+        let html = `<p style='color:#86868b; font-size:14px; margin-top:0;'>${echapperHtml(texte)}</p>`;
+        if (trouvailles.length > 0) {
+            html += `<p style='color:#c62828; font-size:13px; font-weight:600;'>${trouvailles.length} trouvaille(s) détectée(s) jusqu'ici…</p>`;
+        }
+        zone.innerHTML = html;
+    }
+
+    // Affiche le résultat final : soit tout est propre, soit le détail de
+    // chaque trouvaille (dépôt, fichier, commit, motif, aperçu tronqué du secret).
+    function afficherResultatSecurite(zone, trouvailles, stats) {
+        let html = `<p style='font-size:13px; color:#86868b; margin-top:0;'>` +
+            `${stats.repos} dépôt(s), ${stats.fichiers} fichier(s) .html, ${stats.commits} commit(s) analysés.` +
+            (stats.tronques > 0 ? ` ⚠️ ${stats.tronques} dépôt(s) avaient un arbre de fichiers trop volumineux pour être listé entièrement.` : "") +
+            `</p>`;
+
+        if (trouvailles.length === 0) {
+            html += "<p style='color:#2e7d32; font-weight:600; font-size:14px;'>✅ Aucun token ni secret détecté.</p>";
+            zone.innerHTML = html;
+            return;
+        }
+
+        html += `<p style='color:#c62828; font-weight:700; font-size:15px;'>⚠️ ${trouvailles.length} détection(s) — vérifie et révoque ces tokens :</p>`;
+        trouvailles.forEach(t => {
+            const lienCommit = `https://github.com/${config.user}/${t.repo}/blob/${t.shaComplet}/${t.chemin}`;
+            html += `<div class="security-item">
+                <div class="security-repo">${echapperHtml(t.repo)} / ${echapperHtml(t.chemin)}</div>
+                <div class="security-detail">Commit ${echapperHtml(t.sha)} — ${echapperHtml(t.date)}</div>
+                <div class="security-motif">${echapperHtml(t.motif)} : <code>${echapperHtml(t.apercu)}</code></div>
+                <a class="security-lien" href="${lienCommit}" target="_blank" rel="noopener">Voir ce commit sur GitHub</a>
+            </div>`;
+        });
+        zone.innerHTML = html;
+    }
+
+    // Orchestrateur principal du Security check : parcourt tous les dépôts,
+    // tous leurs fichiers .html, et les commits récents de chaque fichier.
+    async function verifierSecurite() {
+        if (!verifierConfig()) return;
+
+        const zone = document.getElementById('security-list');
+        const btn = document.getElementById('btn-security-check');
+        const origineBtn = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = "Analyse en cours…";
+
+        const trouvailles = [];
+        const stats = { repos: 0, fichiers: 0, commits: 0, tronques: 0 };
+        const LIMITE_COMMITS_PAR_FICHIER = 30;
+
+        afficherProgressionSecurite(zone, "Récupération de la liste des dépôts…", trouvailles);
+        zone.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+        try {
+            const repos = await recupererTousLesDepots();
+
+            for (const repo of repos) {
+                stats.repos++;
+                afficherProgressionSecurite(
+                    zone,
+                    `[${stats.repos}/${repos.length}] Analyse de « ${repo.name} »…`,
+                    trouvailles
+                );
+
+                let fichiersHtml = [];
+                try {
+                    const resultatArbre = await listerFichiersHtml(repo.name, repo.default_branch || 'main');
+                    fichiersHtml = resultatArbre.fichiers;
+                    if (resultatArbre.tronque) stats.tronques++;
+                } catch (_) {
+                    continue; // Dépôt vide, inaccessible, ou branche inattendue : on passe au suivant
+                }
+
+                for (const chemin of fichiersHtml) {
+                    stats.fichiers++;
+
+                    let commits = [];
+                    try {
+                        commits = await recupererCommitsFichier(repo.name, chemin, LIMITE_COMMITS_PAR_FICHIER);
+                    } catch (_) {
+                        continue;
+                    }
+
+                    for (const commit of commits) {
+                        stats.commits++;
+                        afficherProgressionSecurite(
+                            zone,
+                            `[${stats.repos}/${repos.length}] « ${repo.name} » — ${chemin} — commit ${stats.commits} analysé…`,
+                            trouvailles
+                        );
+
+                        try {
+                            const contenu = await recupererContenuFichierRef(repo.name, chemin, commit.sha);
+                            const secrets = scannerContenuPourSecrets(contenu);
+                            secrets.forEach(s => {
+                                trouvailles.push({
+                                    repo: repo.name,
+                                    chemin: chemin,
+                                    sha: commit.sha.substring(0, 7),
+                                    shaComplet: commit.sha,
+                                    date: new Date(commit.commit.author.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }),
+                                    motif: s.nom,
+                                    apercu: s.apercu
+                                });
+                            });
+                        } catch (_) {
+                            // Contenu illisible à ce commit (fichier supprimé, renommé…) : on ignore.
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            afficherResultatSecurite(zone, trouvailles, stats);
+            btn.disabled = false;
+            btn.textContent = origineBtn;
+            afficherMessage(`Security check interrompu par une erreur : ${error.message}`, "error");
+            return;
+        }
+
+        btn.disabled = false;
+        btn.textContent = origineBtn;
+        afficherResultatSecurite(zone, trouvailles, stats);
+        zone.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+        if (trouvailles.length > 0) {
+            const nbRepos = new Set(trouvailles.map(t => t.repo)).size;
+            afficherMessage(
+                `⚠️ ALERTE SÉCURITÉ : ${trouvailles.length} token(s)/secret(s) potentiel(s) détecté(s) ` +
+                `dans ${nbRepos} dépôt(s). Détail affiché à l'étape 1, sous le bouton Security check.`,
+                "error"
+            );
+        } else {
+            afficherMessage(
+                `✅ Security check terminé : aucun token détecté (${stats.fichiers} fichier(s) .html, ` +
+                `${stats.commits} commit(s), ${stats.repos} dépôt(s) analysés).`,
+                "success"
+            );
         }
     }
 
@@ -1495,6 +1755,22 @@
             return false;
         }
         return true;
+    }
+
+    // Encode un chemin de fichier pour l'API Contents : chaque segment est encodé
+    // séparément (et non le chemin entier), pour que les « / » d'un sous-dossier
+    // restent des séparateurs de chemin et ne soient pas transformés en %2F.
+    function encoderCheminAPI(chemin) {
+        return chemin.split('/').map(encodeURIComponent).join('/');
+    }
+
+    // Échappe le texte pour une insertion sûre dans du innerHTML.
+    function echapperHtml(texte) {
+        return String(texte)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
     }
 
     // Cherche les fichiers dont le nom ne diffère QUE par la casse (ex :
