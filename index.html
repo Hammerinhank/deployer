@@ -349,6 +349,9 @@
                 <button class="btn" onclick="window.open('https://github.com/settings/tokens?type=beta', '_blank')" style="background-color: #6e6e73; margin-top: 10px;" data-tip="Ouvre dans un nouvel onglet la page GitHub de création d'un jeton « fine-grained », plus récent et plus précis que le token classique : tu peux limiter son accès à un ou plusieurs dépôts seulement, et choisir exactement quelles permissions lui accorder (lecture/écriture du contenu, etc.). Recommandé pour limiter les risques si le jeton venait à fuiter un jour.">🔑 Tokens fine-grained</button>
                 <button class="btn" onclick="sauvegarderConfig()" style="margin-top: 10px;" data-tip="Enregistre ton nom d'utilisateur GitHub et ton token dans le stockage local de ce navigateur (localStorage), pour ne pas avoir à les ressaisir à chaque visite. Le token n'est envoyé qu'à l'API GitHub officielle et n'est jamais transmis lors de la synchronisation entre appareils (voir la section 5 : seule la liste des cibles est synchronisée, pas le token).">Enregistrer les identifiants</button>
                 <button class="btn" onclick="ouvrirDepotsGithub()" style="background-color: #6e6e73; margin-top: 10px;" data-tip="Ouvre dans un nouvel onglet la page github.com listant tous tes dépôts existants. Pratique pour vérifier ce qui existe déjà avant de créer un nouveau dépôt ou d'ajouter une application cible.">📂 Voir mes dépôts GitHub</button>
+
+                <input type="text" id="quick-new-repo-name" placeholder="Nom du nouveau dépôt" style="margin-top: 10px;">
+                <button class="btn" id="btn-creer-depot-rapide" onclick="creerDepotRapide()" style="background-color: #5856d6;" data-tip="Crée un tout nouveau dépôt GitHub avec le nom saisi juste au-dessus, y ajoute une page index.html de départ et active GitHub Pages dessus. Ce raccourci crée uniquement le dépôt sur GitHub : il n'ajoute rien à la liste « gestion des applications cibles » de la section 2 — utilise le bouton « Ajouter cette cible » si tu veux aussi le suivre ici.">➕ Créer un nouveau dépôt</button>
                 <button class="btn" onclick="chargerDescriptifs()" style="background-color: #5856d6; margin-top: 10px;" data-tip="Va chercher, pour chacun de tes dépôts, un éventuel fichier de description sur GitHub, et affiche la liste résultante sous forme éditable. Permet de te souvenir en un coup d'œil de ce que fait chaque application, et de mettre à jour ces descriptifs directement depuis cette page.">📝 Liste des descriptifs</button>
                 <div id="descriptifs-list" style="margin-top: 15px;"></div>
 
@@ -1714,21 +1717,57 @@
     // Crée un dépôt tout neuf, y met une page de départ, active GitHub Pages,
     // puis l'enregistre automatiquement comme cible. Tout s'enchaîne en une action.
     async function creerNouveauDepot() {
-        const repoSaisi = document.getElementById('new-repo-name').value.trim();
+        const champNom = document.getElementById('new-repo-name');
+        const repoSaisi = champNom.value.trim();
         const affichageSaisi = document.getElementById('new-repo-display').value.trim();
         const btn = document.getElementById('btn-creer-depot');
 
         if (!verifierConfig()) return;
         if (!repoSaisi) {
             afficherMessage("Erreur : indique le nom du nouveau dépôt.", "error");
-            document.getElementById('new-repo-name').focus();
+            champNom.focus();
             return;
         }
 
+        await executerCreationDepot(repoSaisi, affichageSaisi, btn, () => {
+            champNom.value = "";
+            document.getElementById('new-repo-display').value = "";
+        });
+    }
+
+    // Raccourci de la section 1 : crée un dépôt à partir du seul nom saisi
+    // (pas de nom d'affichage séparé). IMPORTANT : ce raccourci crée le dépôt
+    // GitHub uniquement — il n'ajoute JAMAIS d'entrée dans la liste « gestion
+    // des applications cibles » de la section 2, qui reste sous le contrôle
+    // exclusif du bouton « Ajouter cette cible ».
+    async function creerDepotRapide() {
+        const champNom = document.getElementById('quick-new-repo-name');
+        const repoSaisi = champNom.value.trim();
+        const btn = document.getElementById('btn-creer-depot-rapide');
+
+        if (!verifierConfig()) return;
+        if (!repoSaisi) {
+            afficherMessage("Erreur : indique le nom du nouveau dépôt.", "error");
+            champNom.focus();
+            return;
+        }
+
+        await executerCreationDepot(repoSaisi, "", btn, () => {
+            champNom.value = "";
+        }, false);
+    }
+
+    // Logique commune de création de dépôt, partagée par creerNouveauDepot()
+    // (section 2, avec nom d'affichage, AJOUTE la cible) et creerDepotRapide()
+    // (section 1, raccourci qui crée le dépôt SANS toucher à la liste des
+    // cibles — ajouterCommeCible=false). viderChamps() est appelé une fois
+    // la création réussie, pour vider les champs propres à chaque formulaire
+    // appelant.
+    async function executerCreationDepot(repoSaisi, affichageSaisi, btn, viderChamps, ajouterCommeCible = true) {
         const ok = await confirmerModal(
             `Créer un nouveau dépôt nommé « ${repoSaisi} » sur ton compte GitHub ?\n\n` +
-            "Une page de départ sera ajoutée, GitHub Pages activé, et le dépôt " +
-            "enregistré comme cible.",
+            "Une page de départ sera ajoutée et GitHub Pages activé." +
+            (ajouterCommeCible ? " Le dépôt sera aussi enregistré comme cible." : ""),
             "Créer",
             "Annuler"
         );
@@ -1799,10 +1838,10 @@
 
             if (!putResp.ok) {
                 const e = await putResp.json();
-                // Le dépôt existe : on l'enregistre quand même comme cible.
-                ajouterCibleAutomatique(affichage, repoReel);
+                // Le dépôt existe : on l'enregistre quand même comme cible (sauf raccourci rapide).
+                if (ajouterCommeCible) ajouterCibleAutomatique(affichage, repoReel);
                 afficherMessage(
-                    `Dépôt « ${repoReel} » créé et enregistré comme cible, mais l'ajout ` +
+                    `Dépôt « ${repoReel} » créé${ajouterCommeCible ? " et enregistré comme cible" : ""}, mais l'ajout ` +
                     `de la page de départ a échoué : ${e.message || putResp.statusText}.`,
                     "error"
                 );
@@ -1826,22 +1865,23 @@
                 try { const pd = await pagesResp.json(); if (pd.html_url) urlPages = pd.html_url; } catch (_) {}
             }
 
-            // 4) Enregistrement comme cible + nettoyage des champs.
-            ajouterCibleAutomatique(affichage, repoReel);
-            document.getElementById('new-repo-name').value = "";
-            document.getElementById('new-repo-display').value = "";
+            // 4) Enregistrement comme cible (sauf raccourci rapide) + nettoyage
+            // des champs propres à l'appelant.
+            if (ajouterCommeCible) ajouterCibleAutomatique(affichage, repoReel);
+            if (viderChamps) viderChamps();
 
+            const mentionCible = ajouterCommeCible ? " et cible enregistrée" : "";
             if (pagesOk) {
                 afficherMessage(
-                    `✅ Dépôt « ${repoReel} » créé, page de départ ajoutée, Pages activé ` +
-                    `et cible enregistrée.\n\nAdresse : ${urlPages}\n\n` +
+                    `✅ Dépôt « ${repoReel} » créé, page de départ ajoutée, Pages activé${mentionCible}.\n\n` +
+                    `Adresse : ${urlPages}\n\n` +
                     "Le site peut mettre 1 à 2 minutes à apparaître la première fois.",
                     "success"
                 );
             } else {
                 const e = await pagesResp.json().catch(() => ({}));
                 afficherMessage(
-                    `Dépôt « ${repoReel} » créé, page de départ ajoutée et cible enregistrée.\n\n` +
+                    `Dépôt « ${repoReel} » créé, page de départ ajoutée${mentionCible}.\n\n` +
                     `⚠️ L'activation automatique de Pages a échoué : ${e.message || pagesResp.statusText}.\n` +
                     `Tu peux l'activer à la main dans Settings > Pages du dépôt (branche ${branche}, dossier /).`,
                     "error"
