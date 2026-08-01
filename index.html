@@ -207,6 +207,8 @@
         .btn-view { background-color: #e5e5ea; color: #1d1d1f; }
         .btn-copy { background-color: #0071e3; color: white; }
         .btn-copy:active { background-color: #005bb5; }
+        .btn-download { background-color: #34c759; color: white; }
+        .btn-download:active { background-color: #248a3d; }
         .btn-restore { background-color: #ff9500; color: white; }
         .btn-restore:active { background-color: #c93400; }
 
@@ -1802,12 +1804,14 @@
                     <div class="commit-actions">
                         <button class="btn-small btn-view">Voir</button>
                         <button class="btn-small btn-copy">Copier</button>
+                        <button class="btn-small btn-download">Télécharger</button>
                         ${estActuelle ? '' : '<button class="btn-small btn-restore">Restaurer</button>'}
                     </div>`;
 
                 // On attache les actions sans passer par onclick="" pour éviter les soucis d'échappement
                 item.querySelector('.btn-view').addEventListener('click', () => voirVersion(repo, commit.sha, dateStr));
                 item.querySelector('.btn-copy').addEventListener('click', (e) => copierVersion(repo, commit.sha, dateStr, e.target));
+                item.querySelector('.btn-download').addEventListener('click', (e) => telechargerVersion(repo, commit.sha, dateStr, e.target));
                 const btnRestore = item.querySelector('.btn-restore');
                 if (btnRestore) {
                     btnRestore.addEventListener('click', () => restaurerVersion(repo, commit.sha, dateStr));
@@ -1924,6 +1928,37 @@
         } catch (error) {
             if (bouton) bouton.textContent = origine; // on restaure le libellé
             afficherMessage(`Impossible de copier cette version : ${error.message}`, "error");
+        }
+    }
+
+    // Télécharge le code HTML d'une version, sous forme de fichier téléchargeable
+    // nommé « <nom-du-dépôt>.html ». Même récupération réseau que « Copier »,
+    // mais on déclenche un téléchargement au lieu d'écrire dans le presse-papier.
+    // Le retour se fait sur le bouton (« Préparation… » puis « Téléchargé ✓ »).
+    async function telechargerVersion(repo, commitSha, dateStr, bouton) {
+        const origine = bouton ? bouton.textContent : null;
+        try {
+            if (bouton) bouton.textContent = "Préparation…";
+            const contenu = await recupererContenuVersion(repo, commitSha);
+
+            const blob = new Blob([contenu], { type: 'text/html' });
+            const blobUrl = URL.createObjectURL(blob);
+            const lien = document.createElement('a');
+            lien.href = blobUrl;
+            lien.download = `${repo}.html`;
+            document.body.appendChild(lien);
+            lien.click();
+            document.body.removeChild(lien);
+            // Libère la mémoire une fois le téléchargement lancé.
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+
+            if (bouton) {
+                bouton.textContent = "Téléchargé ✓";
+                setTimeout(() => { bouton.textContent = origine; }, 2000);
+            }
+        } catch (error) {
+            if (bouton) bouton.textContent = origine;
+            afficherMessage(`Impossible de télécharger cette version : ${error.message}`, "error");
         }
     }
 
