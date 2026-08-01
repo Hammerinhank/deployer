@@ -35,7 +35,11 @@
     {
       "name": "vocabulaire vietnamien",
       "repo": "mon-projet"
+    },
+    {
+      "name": "analyser Texte Vietnamien",
+      "repo": "analyserTexteVietnamien"
     }
   ],
-  "maj": "2026-08-01T08:52:49.643Z"
+  "maj": "2026-08-01T09:45:03.565Z"
 }
