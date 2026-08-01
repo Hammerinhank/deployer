@@ -1,7 +1,7 @@
 {
   "cibles": [
     {
-      "name": "Mon appli de test (parkings)",
+      "name": "Mon appli de test (parkings).",
       "repo": "test-app"
     },
     {
@@ -37,5 +37,5 @@
       "repo": "mon-projet"
     }
   ],
-  "maj": "2026-08-01T08:47:47.149Z"
+  "maj": "2026-08-01T08:52:49.643Z"
 }
