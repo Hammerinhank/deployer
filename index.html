@@ -468,6 +468,10 @@
 
     <!-- ZONE DE STATUS -->
     <div id="status-box" class="status"></div>
+    <!-- Boutons d'action contextuels (ex. accès direct aux pages de tokens
+         GitHub quand une erreur de permission est détectée). Vide et masquée
+         la plupart du temps ; remplie par afficherBoutonsAidePermission(). -->
+    <div id="status-actions" style="display: none; margin-top: 10px;"></div>
 </div>
 
 <!-- Fenêtre de confirmation intégrée -->
@@ -607,8 +611,48 @@
         box.style.display = 'block';
         box.className = 'status ' + type;
         box.textContent = texte;
+        // Chaque nouveau message repart sans boutons d'action ; ils sont
+        // rajoutés explicitement par afficherBoutonsAidePermission() juste
+        // après, pour les seuls messages qui en ont besoin.
+        afficherBoutonsAidePermission(false);
         // On amène le message à l'écran, sinon il reste invisible tout en bas de la page
         box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // Affiche (ou masque) sous la boîte de statut deux boutons de raccourci
+    // vers les pages GitHub de gestion des tokens. Utile quand une erreur
+    // fait probablement suite à une permission manquante sur le token : on
+    // ne peut pas corriger les permissions d'un token depuis l'appli elle-même
+    // (GitHub ne propose aucune API permettant à un token de modifier ses
+    // propres droits — il faut passer par une action manuelle, connectée, sur
+    // github.com), mais on peut au moins amener l'utilisateur directement sur
+    // la bonne page pour qu'il n'ait que le réglage à changer et à Update.
+    function afficherBoutonsAidePermission(afficher) {
+        const zone = document.getElementById('status-actions');
+        zone.innerHTML = '';
+        if (!afficher) {
+            zone.style.display = 'none';
+            return;
+        }
+        zone.style.display = 'block';
+
+        const styleBouton = 'width: auto; display: inline-block; padding: 8px 14px; font-size: 13px; margin: 0 8px 8px 0;';
+
+        const btnClassique = document.createElement('button');
+        btnClassique.className = 'btn';
+        btnClassique.style.cssText = styleBouton + 'background-color: #6e6e73;';
+        btnClassique.textContent = '🔑 Voir mes tokens classiques';
+        btnClassique.onclick = () => window.open('https://github.com/settings/tokens', '_blank');
+        attacherTooltip(btnClassique, "Ouvre la liste de tes tokens classiques sur GitHub. Clique sur le nom de celui utilisé dans Le Déployeur pour vérifier ses cases cochées (« repo » doit être coché), puis Update Token.");
+        zone.appendChild(btnClassique);
+
+        const btnFineGrained = document.createElement('button');
+        btnFineGrained.className = 'btn';
+        btnFineGrained.style.cssText = styleBouton + 'background-color: #6e6e73;';
+        btnFineGrained.textContent = '🔑 Voir mes tokens fine-grained';
+        btnFineGrained.onclick = () => window.open('https://github.com/settings/tokens?type=beta', '_blank');
+        attacherTooltip(btnFineGrained, "Ouvre la liste de tes tokens fine-grained sur GitHub. Clique sur le nom de celui utilisé dans Le Déployeur, règle la permission « Administration » sur « Read and write » (nécessaire pour CRÉER un dépôt), puis clique « Update ». Pas besoin de régénérer le token ni de le recoller dans l'appli, la mise à jour des permissions est immédiate.");
+        zone.appendChild(btnFineGrained);
     }
 
     // Fenêtre de confirmation intégrée : renvoie une promesse (true = confirmé).
@@ -1775,13 +1819,16 @@
                 "token utilisé :\n" +
                 "• Token CLASSIQUE : régénère-le via « 🔑 Tokens classiques » et coche bien la case " +
                 "« repo » (accès complet aux dépôts) lors de sa création.\n" +
-                "• Token FINE-GRAINED : il doit avoir la permission de dépôt « Administration : " +
-                "Read and write » (indispensable pour CRÉER un dépôt, en plus de « Contents : " +
-                "Read and write »). Vérifie aussi que son accès n'est pas limité à une liste de dépôts " +
-                "existants : choisis « All repositories », sinon il ne pourra jamais en créer un nouveau.\n" +
-                "Une fois le nouveau token généré sur GitHub, colle-le dans le champ « Token d'accès " +
-                "personnel » de la section 1 puis clique « Enregistrer les identifiants » avant de " +
-                "réessayer.";
+                "• Token FINE-GRAINED : la cause la plus fréquente est la permission « Administration » " +
+                "réglée sur « Read-only » — elle doit être sur « Read and write » (c'est elle, et non " +
+                "« Contents », qui autorise la CRÉATION d'un dépôt ; « Contents : Read and write » ne " +
+                "sert qu'à modifier un dépôt existant). Vérifie aussi que l'accès n'est pas limité à une " +
+                "liste de dépôts existants : choisis « All repositories », sinon le token ne pourra " +
+                "jamais en créer un nouveau.\n" +
+                "Dans les deux cas, pas besoin de régénérer le token ni de changer sa valeur ici : ouvre " +
+                "la page du token concerné avec l'un des boutons ci-dessous, corrige la permission ou la " +
+                "case à cocher manquante, clique « Update » (fine-grained) ou « Update token » " +
+                "(classique) — la modification prend effet immédiatement — puis reviens ici et réessaie.";
         }
 
         if (statusCode === 403 && (m.includes("rate limit") || m.includes("secondary rate"))) {
@@ -1849,6 +1896,7 @@
                 if (e.errors && e.errors[0] && e.errors[0].message) detail += ` (${e.errors[0].message})`;
                 const aide = diagnostiquerErreurCreationDepot(repoResp.status, detail);
                 afficherMessage(`Impossible de créer le dépôt : ${detail}\n\n💡 Comment corriger :\n${aide}`, "error");
+                afficherBoutonsAidePermission(repoResp.status === 403 || repoResp.status === 401);
                 return;
             }
 
@@ -1903,6 +1951,7 @@
                     "Une fois corrigé, tu peux déployer une page depuis la section 3 sur ce même dépôt.",
                     "error"
                 );
+                afficherBoutonsAidePermission(putResp.status === 403 || putResp.status === 401);
                 return;
             }
 
@@ -1948,6 +1997,7 @@
                     `Tu peux l'activer à la main dans Settings > Pages du dépôt (branche ${branche}, dossier /).`,
                     "error"
                 );
+                afficherBoutonsAidePermission(pagesResp.status === 403);
             }
         } catch (error) {
             afficherMessage(`Erreur réseau : ${error.message}`, "error");
