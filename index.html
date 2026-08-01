@@ -489,7 +489,7 @@
     let tooltipEl = null;
     let tooltipTimeoutMasquage = null;
     let tooltipTimeoutAffichage = null;
-    const DELAI_AVANT_AFFICHAGE = 600; // ms d'attente avant que la bulle apparaisse
+    const DELAI_AVANT_AFFICHAGE = 2000; // ms d'attente avant que la bulle apparaisse
 
     function creerTooltipSiBesoin() {
         if (tooltipEl) return tooltipEl;
@@ -1757,6 +1757,60 @@
         }, false);
     }
 
+    // Traduit une erreur de l'API GitHub survenue lors de la création d'un
+    // dépôt en explication compréhensible + actions concrètes à essayer.
+    // Complète le message d'erreur brut de GitHub, il ne le remplace pas.
+    function diagnostiquerErreurCreationDepot(statusCode, message) {
+        const m = (message || "").toLowerCase();
+
+        if (statusCode === 401 || m.includes("bad credentials")) {
+            return "Ton token semble invalide ou expiré. Vérifie qu'il est bien collé, sans espace ni " +
+                "retour à la ligne, dans le champ « Token d'accès personnel » de la section 1, puis " +
+                "clique « Enregistrer les identifiants ». S'il a expiré, régénère-en un nouveau via " +
+                "« 🔑 Tokens classiques » ou « 🔑 Tokens fine-grained ».";
+        }
+
+        if (statusCode === 403 && m.includes("resource not accessible")) {
+            return "Ton token n'a pas la permission de créer des dépôts sur GitHub. Selon le type de " +
+                "token utilisé :\n" +
+                "• Token CLASSIQUE : régénère-le via « 🔑 Tokens classiques » et coche bien la case " +
+                "« repo » (accès complet aux dépôts) lors de sa création.\n" +
+                "• Token FINE-GRAINED : il doit avoir la permission de dépôt « Administration : " +
+                "Read and write » (indispensable pour CRÉER un dépôt, en plus de « Contents : " +
+                "Read and write »). Vérifie aussi que son accès n'est pas limité à une liste de dépôts " +
+                "existants : choisis « All repositories », sinon il ne pourra jamais en créer un nouveau.\n" +
+                "Une fois le nouveau token généré sur GitHub, colle-le dans le champ « Token d'accès " +
+                "personnel » de la section 1 puis clique « Enregistrer les identifiants » avant de " +
+                "réessayer.";
+        }
+
+        if (statusCode === 403 && (m.includes("rate limit") || m.includes("secondary rate"))) {
+            return "GitHub limite temporairement le nombre de requêtes envoyées avec ce token. Attends " +
+                "une à deux minutes, puis clique à nouveau sur « ➕ Créer un nouveau dépôt ».";
+        }
+
+        if (statusCode === 403) {
+            return "GitHub refuse la création pour une raison liée aux droits du compte ou du token " +
+                "(compte suspendu, organisation restreignant la création de dépôts publics, etc.). " +
+                "Vérifie les réglages de ton compte GitHub, ou essaie de créer le dépôt manuellement " +
+                "sur github.com pour voir le message d'erreur détaillé.";
+        }
+
+        if (statusCode === 422 && m.includes("already exists")) {
+            return "Un dépôt portant déjà ce nom existe sur ton compte. Choisis un autre nom, ou clique " +
+                "« 📂 Voir mes dépôts GitHub » pour vérifier ceux qui existent déjà.";
+        }
+
+        if (statusCode === 404) {
+            return "Vérifie que le nom d'utilisateur GitHub saisi dans le champ « Nom d'utilisateur " +
+                "GitHub » de la section 1 est exact (respecte la casse), puis réessaie.";
+        }
+
+        return "Vérifie ton token dans la section 1 (validité et permissions), puis réessaie. Si le " +
+            "problème persiste, régénère un token via « 🔑 Tokens classiques » ou « 🔑 Tokens " +
+            "fine-grained » et réenregistre-le.";
+    }
+
     // Logique commune de création de dépôt, partagée par creerNouveauDepot()
     // (section 2, avec nom d'affichage, AJOUTE la cible) et creerDepotRapide()
     // (section 1, raccourci qui crée le dépôt SANS toucher à la liste des
@@ -1793,7 +1847,8 @@
                 const e = await repoResp.json();
                 let detail = e.message || repoResp.statusText;
                 if (e.errors && e.errors[0] && e.errors[0].message) detail += ` (${e.errors[0].message})`;
-                afficherMessage(`Impossible de créer le dépôt : ${detail}`, "error");
+                const aide = diagnostiquerErreurCreationDepot(repoResp.status, detail);
+                afficherMessage(`Impossible de créer le dépôt : ${detail}\n\n💡 Comment corriger :\n${aide}`, "error");
                 return;
             }
 
@@ -1840,9 +1895,12 @@
                 const e = await putResp.json();
                 // Le dépôt existe : on l'enregistre quand même comme cible (sauf raccourci rapide).
                 if (ajouterCommeCible) ajouterCibleAutomatique(affichage, repoReel);
+                const detailPut = e.message || putResp.statusText;
+                const aidePut = diagnostiquerErreurCreationDepot(putResp.status, detailPut);
                 afficherMessage(
                     `Dépôt « ${repoReel} » créé${ajouterCommeCible ? " et enregistré comme cible" : ""}, mais l'ajout ` +
-                    `de la page de départ a échoué : ${e.message || putResp.statusText}.`,
+                    `de la page de départ a échoué : ${detailPut}.\n\n💡 Comment corriger :\n${aidePut}\n\n` +
+                    "Une fois corrigé, tu peux déployer une page depuis la section 3 sur ce même dépôt.",
                     "error"
                 );
                 return;
@@ -1880,9 +1938,13 @@
                 );
             } else {
                 const e = await pagesResp.json().catch(() => ({}));
+                const detailPages = e.message || pagesResp.statusText;
+                const indicePermission = (pagesResp.status === 403 || pagesResp.status === 404)
+                    ? " Si tu utilises un token fine-grained, vérifie qu'il a bien la permission de dépôt « Pages : Read and write »."
+                    : "";
                 afficherMessage(
                     `Dépôt « ${repoReel} » créé, page de départ ajoutée${mentionCible}.\n\n` +
-                    `⚠️ L'activation automatique de Pages a échoué : ${e.message || pagesResp.statusText}.\n` +
+                    `⚠️ L'activation automatique de Pages a échoué : ${detailPages}.${indicePermission}\n` +
                     `Tu peux l'activer à la main dans Settings > Pages du dépôt (branche ${branche}, dossier /).`,
                     "error"
                 );
