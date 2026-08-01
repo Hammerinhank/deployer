@@ -485,6 +485,8 @@
     // sur un élément créé dynamiquement (boutons ajoutés par du JS).
     let tooltipEl = null;
     let tooltipTimeoutMasquage = null;
+    let tooltipTimeoutAffichage = null;
+    const DELAI_AVANT_AFFICHAGE = 600; // ms d'attente avant que la bulle apparaisse
 
     function creerTooltipSiBesoin() {
         if (tooltipEl) return tooltipEl;
@@ -517,7 +519,7 @@
         tip.style.visibility = 'visible';
     }
 
-    function afficherTooltip(cible) {
+    function afficherTooltipImmediat(cible) {
         const texte = cible.getAttribute('data-tip');
         if (!texte) return;
         clearTimeout(tooltipTimeoutMasquage);
@@ -527,7 +529,19 @@
         requestAnimationFrame(() => tip.classList.add('visible'));
     }
 
+    // Programme l'affichage après un court délai, pour ne pas faire
+    // apparaître une bulle à chaque simple passage de souris.
+    function programmerAffichageTooltip(cible) {
+        clearTimeout(tooltipTimeoutAffichage);
+        tooltipTimeoutAffichage = setTimeout(() => afficherTooltipImmediat(cible), DELAI_AVANT_AFFICHAGE);
+    }
+
+    function annulerAffichageTooltip() {
+        clearTimeout(tooltipTimeoutAffichage);
+    }
+
     function masquerTooltip() {
+        annulerAffichageTooltip();
         if (!tooltipEl) return;
         tooltipEl.classList.remove('visible');
         tooltipTimeoutMasquage = setTimeout(() => {
@@ -537,11 +551,14 @@
 
     // Pose les écouteurs souris (hover) et clavier (focus) sur un élément.
     // Réutilisable pour les boutons statiques comme pour ceux créés en JS.
+    // Le survol souris attend DELAI_AVANT_AFFICHAGE avant d'afficher la bulle
+    // (et l'annule si la souris repart avant) ; le focus clavier, lui, affiche
+    // tout de suite (utile pour la navigation au clavier/lecteur d'écran).
     function attacherTooltip(el, texte) {
         if (texte) el.setAttribute('data-tip', texte);
-        el.addEventListener('mouseenter', () => afficherTooltip(el));
+        el.addEventListener('mouseenter', () => programmerAffichageTooltip(el));
         el.addEventListener('mouseleave', masquerTooltip);
-        el.addEventListener('focus', () => afficherTooltip(el));
+        el.addEventListener('focus', () => afficherTooltipImmediat(el));
         el.addEventListener('blur', masquerTooltip);
     }
 
