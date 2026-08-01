@@ -341,7 +341,7 @@
             <summary><h2>1. Connexion GitHub</h2></summary>
             <div class="section-contenu">
                 <label for="gh-user">Nom d'utilisateur GitHub</label>
-                <input type="text" id="gh-user" placeholder="Ex: henritavernier">
+                <input type="text" id="gh-user" placeholder="Ex: henritavernier" autocomplete="off">
                 
                 <label for="gh-token">Token d'accès personnel (PAT)</label>
                 <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxx">
@@ -350,7 +350,7 @@
                 <button class="btn" onclick="sauvegarderConfig()" style="margin-top: 10px;" data-tip="Enregistre ton nom d'utilisateur GitHub et ton token dans le stockage local de ce navigateur (localStorage), pour ne pas avoir à les ressaisir à chaque visite. Le token n'est envoyé qu'à l'API GitHub officielle et n'est jamais transmis lors de la synchronisation entre appareils (voir la section 5 : seule la liste des cibles est synchronisée, pas le token).">Enregistrer les identifiants</button>
                 <button class="btn" onclick="ouvrirDepotsGithub()" style="background-color: #6e6e73; margin-top: 10px;" data-tip="Ouvre dans un nouvel onglet la page github.com listant tous tes dépôts existants. Pratique pour vérifier ce qui existe déjà avant de créer un nouveau dépôt ou d'ajouter une application cible.">📂 Voir mes dépôts GitHub</button>
 
-                <input type="text" id="quick-new-repo-name" placeholder="Nom du nouveau dépôt" style="margin-top: 10px;">
+                <input type="text" id="quick-new-repo-name" placeholder="Nom du nouveau dépôt" style="margin-top: 10px;" autocomplete="off">
                 <button class="btn" id="btn-creer-depot-rapide" onclick="creerDepotRapide()" style="background-color: #5856d6;" data-tip="Crée un tout nouveau dépôt GitHub avec le nom saisi juste au-dessus, y ajoute une page index.html de départ et active GitHub Pages dessus. Ce raccourci crée uniquement le dépôt sur GitHub : il n'ajoute rien à la liste « gestion des applications cibles » de la section 2 — utilise le bouton « Ajouter cette cible » si tu veux aussi le suivre ici.">➕ Créer un nouveau dépôt</button>
                 <button class="btn" onclick="chargerDescriptifs()" style="background-color: #5856d6; margin-top: 10px;" data-tip="Va chercher, pour chacun de tes dépôts, un éventuel fichier de description sur GitHub, et affiche la liste résultante sous forme éditable. Permet de te souvenir en un coup d'œil de ce que fait chaque application, et de mettre à jour ces descriptifs directement depuis cette page.">📝 Liste des descriptifs</button>
                 <div id="descriptifs-list" style="margin-top: 15px;"></div>
@@ -376,10 +376,10 @@
                 <div id="target-list"></div>
                 <hr style="border: 0; border-top: 1px solid #e5e5ea; margin: 15px 0;">
                 <label for="new-target-name">Nom de l'application (Affichage)</label>
-                <input type="text" id="new-target-name" placeholder="Ex: Ma Super Boussole">
+                <input type="text" id="new-target-name" placeholder="Ex: Ma Super Boussole" autocomplete="off">
 
                 <label for="new-target-repo">Nom du dépôt sur GitHub</label>
-                <input type="text" id="new-target-repo" list="repos-datalist" placeholder="Tape le nom, ou choisis ci-dessous">
+                <input type="text" id="new-target-repo" list="repos-datalist" placeholder="Tape le nom, ou choisis ci-dessous" autocomplete="off">
                 <!-- Suggestions en saisie libre (combo) alimentées depuis GitHub -->
                 <datalist id="repos-datalist"></datalist>
 
@@ -398,9 +398,9 @@
                     et l'enregistre automatiquement comme cible ci-dessus.
                 </p>
                 <label for="new-repo-name">Nom du dépôt (sur GitHub)</label>
-                <input type="text" id="new-repo-name" placeholder="Ex: ma-nouvelle-app">
+                <input type="text" id="new-repo-name" placeholder="Ex: ma-nouvelle-app" autocomplete="off">
                 <label for="new-repo-display">Nom d'affichage (optionnel)</label>
-                <input type="text" id="new-repo-display" placeholder="Ex: Ma Nouvelle App">
+                <input type="text" id="new-repo-display" placeholder="Ex: Ma Nouvelle App" autocomplete="off">
                 <button class="btn" id="btn-creer-depot" onclick="creerNouveauDepot()" style="background-color: #5856d6;" data-tip="Crée un tout nouveau dépôt GitHub avec le nom indiqué, y ajoute une page index.html de départ, active GitHub Pages dessus, puis l'ajoute automatiquement à la liste des cibles ci-dessus. Pratique pour démarrer une nouvelle application de zéro sans passer par le site github.com.">Créer le dépôt</button>
             </div>
         </details>
@@ -416,7 +416,7 @@
         <textarea id="html-code" placeholder="Colle ton code, ou glisse-dépose un fichier .html ici…"></textarea>
 
         <label for="commit-comment">Commentaire de version (obligatoire)</label>
-        <input type="text" id="commit-comment" placeholder="Ex : Ajout du bouton de partage">
+        <input type="text" id="commit-comment" placeholder="Ex : Ajout du bouton de partage" autocomplete="off">
 
         <button class="btn" onclick="deployerCode()" style="background-color: #5856d6;" data-tip="Envoie le contenu de la zone de code ci-dessus comme nouvelle version (un nouveau commit) du fichier index.html de l'application cible sélectionnée. Le commentaire de version est obligatoire et apparaîtra dans l'historique (section 4). Une vérification automatique confirme ensuite que le fichier réellement en ligne correspond bien à ce qui vient d'être envoyé.">Mettre à jour sur GitHub</button>
     </div>
@@ -454,10 +454,10 @@
                 </p>
 
                 <label for="sync-repo">Dépôt de sauvegarde (doit déjà exister)</label>
-                <input type="text" id="sync-repo" list="repos-datalist" placeholder="Ex: deployeur-config">
+                <input type="text" id="sync-repo" list="repos-datalist" placeholder="Ex: deployeur-config" autocomplete="off">
 
                 <label for="sync-file">Nom du fichier</label>
-                <input type="text" id="sync-file" placeholder="cibles.json" value="cibles.json">
+                <input type="text" id="sync-file" placeholder="cibles.json" value="cibles.json" autocomplete="off">
 
                 <button class="btn" onclick="enregistrerConfigSync(this)" style="background-color: #5856d6;" data-tip="Mémorise, dans ce navigateur, le dépôt GitHub et le nom du fichier JSON à utiliser pour synchroniser la liste des cibles entre tes appareils (iMac et iPhone). Ce réglage doit être identique sur chaque appareil pour qu'ils partagent bien la même liste.">Enregistrer ce réglage de synchro</button>
                 <button class="btn" onclick="envoyerCiblesManuel(this)" style="background-color: #6e6e73; margin-top: 10px;" data-tip="Pousse immédiatement, à la main, la liste actuelle de tes cibles (noms d'affichage + noms de dépôts — jamais ton token) vers le fichier JSON du dépôt de synchro configuré ci-dessus, en écrasant la version qui s'y trouve.">⬆️ Envoyer les cibles vers GitHub</button>
