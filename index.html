@@ -589,6 +589,13 @@
     // horodatage sert à réconcilier la copie locale (navigateur) et la copie
     // GitHub. On migre au passage l'ancien format (simple tableau) sans perte.
     let ciblesMaj = null;
+    // Dernière application choisie dans les menus « Choisir l'application à
+    // mettre à jour » / « Application concernée » (les deux menus étant
+    // synchronisés, une seule valeur — le nom du dépôt — suffit). Elle vit
+    // désormais DANS le même objet que les cibles (deployer_cibles), pour
+    // profiter du même mécanisme de double persistance qu'elles : copie
+    // locale ET synchro vers le fichier JSON du dépôt GitHub (section 5).
+    let derniereCibleChoisie = localStorage.getItem('deployer_derniere_cible') || ''; // repli : ancienne clé isolée d'une version précédente
     (function chargerCiblesLocal() {
         const brut = localStorage.getItem('deployer_cibles');
         if (!brut) return;
@@ -599,6 +606,7 @@
             } else if (donnees && Array.isArray(donnees.cibles)) {
                 cibles = donnees.cibles;         // nouveau format { cibles, maj }
                 ciblesMaj = donnees.maj || null;
+                derniereCibleChoisie = donnees.derniereCible || derniereCibleChoisie;
             }
         } catch (_) { /* données illisibles : on repart d'une liste vide */ }
     })();
@@ -606,15 +614,10 @@
     document.getElementById('gh-user').value = config.user;
     document.getElementById('gh-token').value = config.token;
 
-    // Dernière application choisie dans les menus « Choisir l'application à
-    // mettre à jour » / « Application concernée » (les deux menus étant
-    // synchronisés, une seule valeur — le nom du dépôt — suffit à retenir
-    // le choix commun). Même mécanisme que les autres réglages : simple
-    // clé localStorage, relue une fois au démarrage.
-    let derniereCibleChoisie = localStorage.getItem('deployer_derniere_cible') || '';
     function memoriserCibleChoisie(repo) {
+        if (repo === derniereCibleChoisie) return; // rien de changé, on n'écrit/pousse pas pour rien
         derniereCibleChoisie = repo || '';
-        localStorage.setItem('deployer_derniere_cible', derniereCibleChoisie);
+        enregistrerCibles(true); // même mécanisme que la liste des cibles : local + push GitHub si synchro réglée
     }
 
     function afficherMessage(texte, type) {
@@ -1576,7 +1579,7 @@
     // la copie locale reste la référence et on prévient l'utilisateur).
     function enregistrerCibles(pousser) {
         ciblesMaj = new Date().toISOString();
-        localStorage.setItem('deployer_cibles', JSON.stringify({ cibles: cibles, maj: ciblesMaj }));
+        localStorage.setItem('deployer_cibles', JSON.stringify({ cibles: cibles, derniereCible: derniereCibleChoisie, maj: ciblesMaj }));
         if (pousser && syncConfiguree() && config.user && config.token) {
             pousserCiblesVersGithub().then(ok => {
                 if (!ok) {
@@ -1614,7 +1617,8 @@
         // Tolère l'ancien format (tableau nu) comme en local.
         const arr = Array.isArray(obj) ? obj : (Array.isArray(obj.cibles) ? obj.cibles : []);
         const maj = Array.isArray(obj) ? null : (obj.maj || null);
-        return { cibles: arr, maj: maj, sha: data.sha };
+        const derniereCible = Array.isArray(obj) ? null : (obj.derniereCible || null);
+        return { cibles: arr, maj: maj, derniereCible: derniereCible, sha: data.sha };
     }
 
     // Pousse la copie locale vers le fichier GitHub (création ou mise à jour).
@@ -1627,7 +1631,7 @@
         // On garantit un horodatage, pour que les deux copies portent le même.
         if (!ciblesMaj) {
             ciblesMaj = new Date().toISOString();
-            localStorage.setItem('deployer_cibles', JSON.stringify({ cibles: cibles, maj: ciblesMaj }));
+            localStorage.setItem('deployer_cibles', JSON.stringify({ cibles: cibles, derniereCible: derniereCibleChoisie, maj: ciblesMaj }));
         }
 
         const url = `https://api.github.com/repos/${config.user}/${sync.repo}/contents/${encodeURIComponent(sync.chemin)}`;
@@ -1639,7 +1643,7 @@
             if (r.ok) { const d = await r.json(); sha = d.sha; }
         } catch (_) {}
 
-        const contenu = JSON.stringify({ cibles: cibles, maj: ciblesMaj }, null, 2);
+        const contenu = JSON.stringify({ cibles: cibles, derniereCible: derniereCibleChoisie, maj: ciblesMaj }, null, 2);
         const body = {
             message: `Cibles (${cibles.length}) synchronisées via Le Déployeur`,
             content: encoderBase64(contenu)
@@ -1672,15 +1676,17 @@
 
             const majLocale = ciblesMaj ? Date.parse(ciblesMaj) : 0;
             const majDistante = distant.maj ? Date.parse(distant.maj) : 0;
-            const memeContenu = JSON.stringify(distant.cibles) === JSON.stringify(cibles);
+            const memeContenu = JSON.stringify(distant.cibles) === JSON.stringify(cibles)
+                && (distant.derniereCible || '') === (derniereCibleChoisie || '');
 
             if (memeContenu) return; // Déjà identiques : rien à faire, on ne dit rien.
 
             if (majDistante >= majLocale) {
                 // Le distant est plus récent (ou fait autorité) : on l'adopte en local.
                 cibles = distant.cibles;
+                derniereCibleChoisie = distant.derniereCible || derniereCibleChoisie;
                 ciblesMaj = distant.maj || new Date().toISOString();
-                localStorage.setItem('deployer_cibles', JSON.stringify({ cibles: cibles, maj: ciblesMaj }));
+                localStorage.setItem('deployer_cibles', JSON.stringify({ cibles: cibles, derniereCible: derniereCibleChoisie, maj: ciblesMaj }));
                 rafraichirCiblesUI();
                 afficherMessage(`Cibles récupérées depuis GitHub (${cibles.length}).`, "success");
             } else {
@@ -1760,8 +1766,9 @@
                 const distant = await lireCiblesDistantes();
                 if (!distant) { afficherMessage("Aucun fichier de cibles trouvé sur GitHub pour l'instant.", "error"); return false; }
                 cibles = distant.cibles;
+                derniereCibleChoisie = distant.derniereCible || derniereCibleChoisie;
                 ciblesMaj = distant.maj || new Date().toISOString();
-                localStorage.setItem('deployer_cibles', JSON.stringify({ cibles: cibles, maj: ciblesMaj }));
+                localStorage.setItem('deployer_cibles', JSON.stringify({ cibles: cibles, derniereCible: derniereCibleChoisie, maj: ciblesMaj }));
                 rafraichirCiblesUI();
                 return true;
             } catch (e) {
