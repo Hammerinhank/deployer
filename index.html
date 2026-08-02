@@ -606,6 +606,17 @@
     document.getElementById('gh-user').value = config.user;
     document.getElementById('gh-token').value = config.token;
 
+    // Dernière application choisie dans les menus « Choisir l'application à
+    // mettre à jour » / « Application concernée » (les deux menus étant
+    // synchronisés, une seule valeur — le nom du dépôt — suffit à retenir
+    // le choix commun). Même mécanisme que les autres réglages : simple
+    // clé localStorage, relue une fois au démarrage.
+    let derniereCibleChoisie = localStorage.getItem('deployer_derniere_cible') || '';
+    function memoriserCibleChoisie(repo) {
+        derniereCibleChoisie = repo || '';
+        localStorage.setItem('deployer_derniere_cible', derniereCibleChoisie);
+    }
+
     function afficherMessage(texte, type) {
         const box = document.getElementById('status-box');
         box.style.display = 'block';
@@ -1207,6 +1218,13 @@
             });
         });
 
+        // On réapplique la dernière application choisie (si elle existe encore
+        // parmi les cibles), pour ne pas retomber sur la première de la liste
+        // à chaque rechargement de la page.
+        if (derniereCibleChoisie && cibles.some(c => c.repo === derniereCibleChoisie)) {
+            select.value = derniereCibleChoisie;
+        }
+
         // Après avoir (re)construit les options, on réaligne les deux menus
         // pour qu'ils pointent sur la même application.
         synchroniserSelects();
@@ -1230,10 +1248,14 @@
     }
 
     document.getElementById('select-target')
-        .addEventListener('change', () => synchroniserSelects('deploiement'));
+        .addEventListener('change', (e) => {
+            synchroniserSelects('deploiement');
+            memoriserCibleChoisie(e.target.value);
+        });
     document.getElementById('select-history-target')
-        .addEventListener('change', () => {
+        .addEventListener('change', (e) => {
             synchroniserSelects('historique');
+            memoriserCibleChoisie(e.target.value);
             afficherLigneUrlAppli(null); // URL obsolète : on efface la ligne
         });
 
