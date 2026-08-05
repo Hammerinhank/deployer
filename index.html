@@ -112,33 +112,24 @@
             border-radius: 6px;
             margin-bottom: 8px;
             font-size: 14px;
-            /* On coupe la sélection de texte et le menu contextuel iOS sur la
-               ligne : c'est ce qui empêchait de « saisir » l'item (Safari
-               démarrait sa loupe de sélection au lieu du glissement). */
             -webkit-user-select: none;
             user-select: none;
             -webkit-touch-callout: none;
         }
-        /* Le champ de saisie du mode édition doit, lui, rester sélectionnable. */
         .target-item input {
             -webkit-user-select: text;
             user-select: text;
             -webkit-touch-callout: default;
         }
-        /* Ligne en cours de glissement : légèrement soulevée et surlignée */
         .target-item.dragging {
             opacity: 0.9;
             background: #eaf3ff;
             box-shadow: 0 6px 18px rgba(0,0,0,0.18);
         }
-        /* Pendant un glissement, on interdit toute sélection ailleurs sur la page. */
         body.drag-actif, body.drag-actif * {
             -webkit-user-select: none !important;
             user-select: none !important;
         }
-        /* Poignée « ⠿ » servant de prise pour réordonner (souris et doigt).
-           - touch-action: none empêche la page de défiler pendant le glissement ;
-           - le fond gris et la taille en font une prise facile à viser au doigt. */
         .drag-handle {
             flex-shrink: 0;
             cursor: grab;
@@ -172,7 +163,6 @@
         .btn-edit-cible:active { background: #005bb5; }
         .delete-btn { flex-shrink: 0; color: #ff3b30; background: none; border: none; font-weight: bold; cursor: pointer; }
 
-        /* Styles de l'historique */
         .commit-item {
             background: #f5f5f7;
             padding: 12px;
@@ -212,7 +202,6 @@
         .btn-restore { background-color: #ff9500; color: white; }
         .btn-restore:active { background-color: #c93400; }
 
-        /* Styles des résultats du Security check */
         .security-item {
             background: #fff5f5;
             border: 1px solid #ffcdd2;
@@ -238,7 +227,6 @@
             text-decoration: none;
         }
 
-        /* Styles de la liste des descriptifs */
         .descriptif-item {
             background: #f5f5f7;
             padding: 12px;
@@ -262,7 +250,6 @@
         }
         .btn-edit:active { background-color: #005bb5; }
 
-        /* Fenêtre de confirmation intégrée (remplace le confirm() natif) */
         .modal-overlay {
             position: fixed;
             inset: 0;
@@ -305,10 +292,6 @@
         .modal-btn-confirm { background: #0071e3; color: #fff; }
         .modal-btn-confirm:active { background: #005bb5; }
 
-        /* Bulle d'explication détaillée affichée au survol (souris) ou au focus
-           (clavier) de tout élément portant un attribut data-tip. Une seule
-           bulle est créée et réutilisée pour tous les éléments (voir
-           initTooltips() dans le script). */
         .tooltip-detaille {
             position: absolute;
             display: none;
@@ -380,7 +363,6 @@
 
                 <label for="new-target-repo">Nom du dépôt sur GitHub</label>
                 <input type="text" id="new-target-repo" list="repos-datalist" placeholder="Tape le nom, ou choisis ci-dessous" autocomplete="off">
-                <!-- Suggestions en saisie libre (combo) alimentées depuis GitHub -->
                 <datalist id="repos-datalist"></datalist>
 
                 <label for="select-repo-existant">…ou choisir un dépôt existant</label>
@@ -428,7 +410,6 @@
         <select id="select-history-target"></select>
 
         <button class="btn" onclick="copierUrlAppli(this)" style="background-color: #34c759;" data-tip="Calcule l'adresse GitHub Pages de l'application sélectionnée (du type https://tonpseudo.github.io/depot/), la copie dans le presse-papier, et l'affiche juste en dessous sous forme de lien cliquable pour vérifier tout de suite qu'elle fonctionne bien.">🔗 Copier l'URL de l'appli</button>
-        <!-- Ligne remplie au clic : URL cliquable pour vérifier que l'appli se lance -->
         <div id="url-appli-ligne"></div>
         <button class="btn" id="btn-history" onclick="chargerHistorique()" style="background-color: #ff9500; margin-top: 10px;" data-tip="Récupère la liste des commits (versions successives) du fichier index.html de l'application sélectionnée, avec leur date et leur commentaire de version, pour pouvoir ensuite consulter, copier, télécharger ou restaurer une ancienne version ci-dessous.">Charger l'historique</button>
 
@@ -468,9 +449,6 @@
 
     <!-- ZONE DE STATUS -->
     <div id="status-box" class="status"></div>
-    <!-- Boutons d'action contextuels (ex. accès direct aux pages de tokens
-         GitHub quand une erreur de permission est détectée). Vide et masquée
-         la plupart du temps ; remplie par afficherBoutonsAidePermission(). -->
     <div id="status-actions" style="display: none; margin-top: 10px;"></div>
 </div>
 
@@ -486,14 +464,10 @@
 </div>
 
 <script>
-    // ---- Bulles d'explication détaillée au survol ----------------------
-    // Une seule bulle est créée et réutilisée pour tous les éléments portant
-    // un attribut data-tip. attacherTooltip(el, texte) permet d'en poser une
-    // sur un élément créé dynamiquement (boutons ajoutés par du JS).
     let tooltipEl = null;
     let tooltipTimeoutMasquage = null;
     let tooltipTimeoutAffichage = null;
-    const DELAI_AVANT_AFFICHAGE = 2000; // ms d'attente avant que la bulle apparaisse
+    const DELAI_AVANT_AFFICHAGE = 2000;
 
     function creerTooltipSiBesoin() {
         if (tooltipEl) return tooltipEl;
@@ -536,8 +510,6 @@
         requestAnimationFrame(() => tip.classList.add('visible'));
     }
 
-    // Programme l'affichage après un court délai, pour ne pas faire
-    // apparaître une bulle à chaque simple passage de souris.
     function programmerAffichageTooltip(cible) {
         clearTimeout(tooltipTimeoutAffichage);
         tooltipTimeoutAffichage = setTimeout(() => afficherTooltipImmediat(cible), DELAI_AVANT_AFFICHAGE);
@@ -556,11 +528,6 @@
         }, 150);
     }
 
-    // Pose les écouteurs souris (hover) et clavier (focus) sur un élément.
-    // Réutilisable pour les boutons statiques comme pour ceux créés en JS.
-    // Le survol souris attend DELAI_AVANT_AFFICHAGE avant d'afficher la bulle
-    // (et l'annule si la souris repart avant) ; le focus clavier, lui, affiche
-    // tout de suite (utile pour la navigation au clavier/lecteur d'écran).
     function attacherTooltip(el, texte) {
         if (texte) el.setAttribute('data-tip', texte);
         el.addEventListener('mouseenter', () => programmerAffichageTooltip(el));
@@ -569,55 +536,40 @@
         el.addEventListener('blur', masquerTooltip);
     }
 
-    // Pose les tooltips sur tous les boutons déjà présents dans le HTML
-    // (ceux qui portent directement l'attribut data-tip dans la page).
     function initTooltips() {
         document.querySelectorAll('[data-tip]').forEach(el => attacherTooltip(el));
-        // On masque aussi la bulle si on referme/ouvre une section repliable,
-        // pour éviter qu'elle reste affichée au mauvais endroit.
         document.querySelectorAll('.section-repliable').forEach(d => {
             d.addEventListener('toggle', masquerTooltip);
         });
         window.addEventListener('scroll', masquerTooltip, { passive: true });
     }
 
-    // Chargement initial des données stockées sur l'iPhone
     let config = JSON.parse(localStorage.getItem('deployer_config')) || { user: '', token: '' };
     let cibles = [];
-    // Les cibles sont désormais stockées avec un horodatage de dernière
-    // modification : deployer_cibles = { cibles:[...], maj:"<ISO>" }. Cet
-    // horodatage sert à réconcilier la copie locale (navigateur) et la copie
-    // GitHub. On migre au passage l'ancien format (simple tableau) sans perte.
     let ciblesMaj = null;
-    // Dernière application choisie dans les menus « Choisir l'application à
-    // mettre à jour » / « Application concernée » (les deux menus étant
-    // synchronisés, une seule valeur — le nom du dépôt — suffit). Elle vit
-    // désormais DANS le même objet que les cibles (deployer_cibles), pour
-    // profiter du même mécanisme de double persistance qu'elles : copie
-    // locale ET synchro vers le fichier JSON du dépôt GitHub (section 5).
-    let derniereCibleChoisie = localStorage.getItem('deployer_derniere_cible') || ''; // repli : ancienne clé isolée d'une version précédente
+    let derniereCibleChoisie = localStorage.getItem('deployer_derniere_cible') || '';
     (function chargerCiblesLocal() {
         const brut = localStorage.getItem('deployer_cibles');
         if (!brut) return;
         try {
             const donnees = JSON.parse(brut);
             if (Array.isArray(donnees)) {
-                cibles = donnees;                // ancien format : tableau nu
+                cibles = donnees;
             } else if (donnees && Array.isArray(donnees.cibles)) {
-                cibles = donnees.cibles;         // nouveau format { cibles, maj }
+                cibles = donnees.cibles;
                 ciblesMaj = donnees.maj || null;
                 derniereCibleChoisie = donnees.derniereCible || derniereCibleChoisie;
             }
-        } catch (_) { /* données illisibles : on repart d'une liste vide */ }
+        } catch (_) { }
     })();
 
     document.getElementById('gh-user').value = config.user;
     document.getElementById('gh-token').value = config.token;
 
     function memoriserCibleChoisie(repo) {
-        if (repo === derniereCibleChoisie) return; // rien de changé, on n'écrit/pousse pas pour rien
+        if (repo === derniereCibleChoisie) return;
         derniereCibleChoisie = repo || '';
-        enregistrerCibles(true); // même mécanisme que la liste des cibles : local + push GitHub si synchro réglée
+        enregistrerCibles(true);
     }
 
     function afficherMessage(texte, type) {
@@ -625,22 +577,10 @@
         box.style.display = 'block';
         box.className = 'status ' + type;
         box.textContent = texte;
-        // Chaque nouveau message repart sans boutons d'action ; ils sont
-        // rajoutés explicitement par afficherBoutonsAidePermission() juste
-        // après, pour les seuls messages qui en ont besoin.
         afficherBoutonsAidePermission(false);
-        // On amène le message à l'écran, sinon il reste invisible tout en bas de la page
         box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
-    // Affiche (ou masque) sous la boîte de statut deux boutons de raccourci
-    // vers les pages GitHub de gestion des tokens. Utile quand une erreur
-    // fait probablement suite à une permission manquante sur le token : on
-    // ne peut pas corriger les permissions d'un token depuis l'appli elle-même
-    // (GitHub ne propose aucune API permettant à un token de modifier ses
-    // propres droits — il faut passer par une action manuelle, connectée, sur
-    // github.com), mais on peut au moins amener l'utilisateur directement sur
-    // la bonne page pour qu'il n'ait que le réglage à changer et à Update.
     function afficherBoutonsAidePermission(afficher) {
         const zone = document.getElementById('status-actions');
         zone.innerHTML = '';
@@ -669,10 +609,6 @@
         zone.appendChild(btnFineGrained);
     }
 
-    // Fenêtre de confirmation intégrée : renvoie une promesse (true = confirmé).
-    // On retire d'abord le focus du champ actif pour faire disparaître le
-    // clavier, puis on laisse un court instant à l'animation avant d'afficher
-    // la fenêtre bien centrée — plus jamais de boutons cachés par le clavier.
     function confirmerModal(message, texteConfirmer, texteAnnuler) {
         return new Promise((resolve) => {
             if (document.activeElement && document.activeElement.blur) {
@@ -696,15 +632,12 @@
             }
             function onConfirm() { nettoyer(); resolve(true); }
             function onCancel() { nettoyer(); resolve(false); }
-            // Toucher le fond sombre équivaut à annuler
             function onFond(e) { if (e.target === overlay) { nettoyer(); resolve(false); } }
 
             btnConfirm.addEventListener('click', onConfirm);
             btnCancel.addEventListener('click', onCancel);
             overlay.addEventListener('click', onFond);
 
-            // Petit délai : le temps que le clavier commence à se refermer,
-            // pour que la fenêtre s'affiche à sa place définitive.
             setTimeout(() => overlay.classList.add('visible'), 120);
         });
     }
@@ -713,9 +646,6 @@
         const nouveauUser = document.getElementById('gh-user').value.trim();
         const nouveauToken = document.getElementById('gh-token').value.trim();
 
-        // Garde-fou 1 : on REFUSE d'enregistrer un champ vide.
-        // C'est le vrai risque : un champ vidé par mégarde écraserait des
-        // identifiants valides. Ici, on ne touche à rien.
         if (!nouveauUser || !nouveauToken) {
             afficherMessage(
                 "⛔ Enregistrement annulé — aucun changement effectué.\n\n" +
@@ -726,9 +656,6 @@
             return;
         }
 
-        // Garde-fou 2 : si on remplace des identifiants existants par des
-        // valeurs DIFFÉRENTES, on demande une confirmation explicite.
-        // (Si rien ne change, on enregistre sans embêter l'utilisateur.)
         const remplaceUser = config.user && config.user !== nouveauUser;
         const remplaceToken = config.token && config.token !== nouveauToken;
 
@@ -749,12 +676,9 @@
         config.token = nouveauToken;
         localStorage.setItem('deployer_config', JSON.stringify(config));
         afficherMessage("Identifiants enregistrés localement avec succès !", "success");
-        // Les identifiants sont valides : on remplit la combo des dépôts en
-        // arrière-plan (silencieux, pour ne pas masquer le message ci-dessus).
         chargerListeDepots(true);
     }
 
-    // Ouvre la page GitHub listant tous les dépôts du compte
     function ouvrirDepotsGithub() {
         const user = document.getElementById('gh-user').value.trim();
         if(!user) {
@@ -765,14 +689,9 @@
         window.open(`https://github.com/${user}?tab=repositories`, '_blank');
     }
 
-    // ---------- LISTE & ÉDITION DES DESCRIPTIFS ----------
-
-    // Récupère tous les dépôts du compte et affiche leur descriptif
     async function chargerDescriptifs() {
         const listDiv = document.getElementById('descriptifs-list');
 
-        // IMPORTANT : tout le retour (chargement / erreur / résultat) s'affiche ICI,
-        // juste sous le bouton, et PAS dans la zone de statut tout en bas de la page.
         if(!config.user || !config.token) {
             listDiv.innerHTML = "<p style='color:#c62828; font-size:14px; font-weight:600;'>⛔ Renseigne d'abord ton nom d'utilisateur et ton token à l'étape 1.</p>";
             listDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -783,7 +702,6 @@
         listDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
         try {
-            // On récupère tous les dépôts dont on est propriétaire (avec pagination)
             let repos = [];
             let page = 1;
             const parPage = 100;
@@ -800,9 +718,9 @@
                 }
                 const lot = await reponse.json();
                 repos = repos.concat(lot);
-                if (lot.length < parPage) break; // Dernière page atteinte
+                if (lot.length < parPage) break;
                 page++;
-                if (page > 10) break; // Sécurité (1000 dépôts max)
+                if (page > 10) break;
             }
 
             if (repos.length === 0) {
@@ -823,7 +741,6 @@
         }
     }
 
-    // Affiche un dépôt en mode lecture (descriptif + bouton Edit)
     function afficherDescriptifLecture(item, repoName, description) {
         item.innerHTML = "";
 
@@ -853,7 +770,6 @@
         item.appendChild(row);
     }
 
-    // Affiche un dépôt en mode édition (champ de saisie + Enregistrer / Annuler)
     function afficherDescriptifEdition(item, repoName, descriptionActuelle) {
         item.innerHTML = "";
 
@@ -901,7 +817,6 @@
         input.focus();
     }
 
-    // Envoie le nouveau descriptif à GitHub (PATCH sur le dépôt)
     async function enregistrerDescriptif(repoName, description) {
         try {
             const url = `https://api.github.com/repos/${config.user}/${repoName}`;
@@ -924,16 +839,8 @@
         }
     }
 
-    // ================= SECURITY CHECK (tokens câblés en dur) =================
-    // Objectif : parcourir TOUS les dépôts du compte, y trouver tous les
-    // fichiers .html et .py, et pour chacun analyser ses commits récents à la
-    // recherche de tokens/secrets écrits en clair dans le code.
-
-    // Extensions de fichiers passées au crible par le Security check.
     const EXTENSIONS_SECURITE = ['.html', '.py'];
 
-    // Liste des fichiers .html/.py d'un dépôt via l'arbre Git complet (recursive=1).
-    // Renvoie un tableau de chemins (ex: ["index.html", "scripts/deploy.py"]).
     async function listerFichiersASurveiller(repo, branche) {
         const url = `https://api.github.com/repos/${config.user}/${repo}/git/trees/${encodeURIComponent(branche)}?recursive=1`;
         const rep = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
@@ -950,7 +857,6 @@
         return { fichiers, tronque: !!data.truncated };
     }
 
-    // Historique des commits ayant touché un fichier donné (limité à `limite`).
     async function recupererCommitsFichier(repo, chemin, limite) {
         const url = `https://api.github.com/repos/${config.user}/${repo}/commits?path=${encodeURIComponent(chemin)}&per_page=${limite}`;
         const rep = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
@@ -962,7 +868,6 @@
         return await rep.json();
     }
 
-    // Contenu d'un fichier à un commit précis (chemin encodé segment par segment).
     async function recupererContenuFichierRef(repo, chemin, ref) {
         const url = `https://api.github.com/repos/${config.user}/${repo}/contents/${encoderCheminAPI(chemin)}?ref=${ref}`;
         const rep = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
@@ -972,18 +877,15 @@
             throw new Error(detail);
         }
         const data = await rep.json();
-        if (!data.content) return ""; // Peut être un type de fichier inattendu
+        if (!data.content) return "";
         return decoderBase64(data.content);
     }
 
-    // Raccourcit une valeur sensible pour l'affichage (jamais le secret complet).
     function redigerValeur(valeur) {
         if (valeur.length <= 10) return valeur.slice(0, 2) + "…" + valeur.slice(-2);
         return valeur.slice(0, 6) + "…" + valeur.slice(-4);
     }
 
-    // Recherche, dans un contenu texte, des motifs correspondant à des tokens ou
-    // secrets connus. Renvoie un tableau de { nom, apercu } (apercu = tronqué).
     function scannerContenuPourSecrets(contenu) {
         if (!contenu) return [];
         const trouvailles = [];
@@ -1003,14 +905,12 @@
             while ((match = m.regex.exec(contenu)) !== null) {
                 const valeur = match[1] || match[0];
                 trouvailles.push({ nom: m.nom, apercu: redigerValeur(valeur) });
-                if (m.regex.lastIndex === match.index) m.regex.lastIndex++; // garde-fou anti-boucle
+                if (m.regex.lastIndex === match.index) m.regex.lastIndex++;
             }
         });
         return trouvailles;
     }
 
-    // Affiche l'état d'avancement pendant l'analyse (progression + compteur de
-    // trouvailles déjà détectées, sans lister leur détail pour rester lisible).
     function afficherProgressionSecurite(zone, texte, trouvailles) {
         let html = `<p style='color:#86868b; font-size:14px; margin-top:0;'>${echapperHtml(texte)}</p>`;
         if (trouvailles.length > 0) {
@@ -1019,8 +919,6 @@
         zone.innerHTML = html;
     }
 
-    // Affiche le résultat final : soit tout est propre, soit le détail de
-    // chaque trouvaille (dépôt, fichier, commit, motif, aperçu tronqué du secret).
     function afficherResultatSecurite(zone, trouvailles, stats) {
         let html = `<p style='font-size:13px; color:#86868b; margin-top:0;'>` +
             `${stats.repos} dépôt(s), ${stats.fichiers} fichier(s) .html/.py, ${stats.commits} commit(s) analysés.` +
@@ -1046,8 +944,6 @@
         zone.innerHTML = html;
     }
 
-    // Orchestrateur principal du Security check : parcourt tous les dépôts,
-    // tous leurs fichiers .html, et les commits récents de chaque fichier.
     async function verifierSecurite() {
         if (!verifierConfig()) return;
 
@@ -1081,7 +977,7 @@
                     fichiersASurveiller = resultatArbre.fichiers;
                     if (resultatArbre.tronque) stats.tronques++;
                 } catch (_) {
-                    continue; // Dépôt vide, inaccessible, ou branche inattendue : on passe au suivant
+                    continue;
                 }
 
                 for (const chemin of fichiersASurveiller) {
@@ -1117,7 +1013,6 @@
                                 });
                             });
                         } catch (_) {
-                            // Contenu illisible à ce commit (fichier supprimé, renommé…) : on ignore.
                         }
                     }
                 }
@@ -1161,23 +1056,18 @@
         selectHistory.innerHTML = "";
 
         cibles.forEach((cible, index) => {
-            // Détermination dynamique de l'URL d'archivage sur GitHub
             const repoUrl = `https://github.com/${config.user || ''}/${cible.repo}`;
 
-            // On construit chaque ligne en éléments DOM (et non plus en innerHTML)
-            // pour pouvoir y attacher le glisser-déposer et l'édition sur place.
             const item = document.createElement('div');
             item.className = 'target-item';
-            item.dataset.index = index; // Index d'origine, utilisé après un glissement
+            item.dataset.index = index;
 
-            // Poignée de glissement (à gauche) : c'est la prise pour réordonner.
             const handle = document.createElement('span');
             handle.className = 'drag-handle';
             handle.textContent = '⠿';
             attacherTooltip(handle, "Poignée de glissement : clique (ou touche) et maintiens, puis fais glisser cette ligne vers le haut ou vers le bas pour changer l'ordre des applications dans la liste. Le nouvel ordre est mémorisé automatiquement.");
             activerDragCible(handle, item);
 
-            // Bloc central : nom d'affichage cliquable + nom du dépôt en dessous.
             const info = document.createElement('div');
             info.className = 'target-info';
             const lien = document.createElement('a');
@@ -1191,7 +1081,6 @@
             info.appendChild(lien);
             info.appendChild(repoLabel);
 
-            // Actions (à droite) : Edit (changer le libellé) + Supprimer.
             const actions = document.createElement('div');
             actions.className = 'target-actions';
             const btnEdit = document.createElement('button');
@@ -1212,7 +1101,6 @@
             item.appendChild(actions);
             listDiv.appendChild(item);
 
-            // Remplir les deux menus déroulants (déploiement + historique)
             [select, selectHistory].forEach(s => {
                 const opt = document.createElement('option');
                 opt.value = cible.repo;
@@ -1221,21 +1109,13 @@
             });
         });
 
-        // On réapplique la dernière application choisie (si elle existe encore
-        // parmi les cibles), pour ne pas retomber sur la première de la liste
-        // à chaque rechargement de la page.
         if (derniereCibleChoisie && cibles.some(c => c.repo === derniereCibleChoisie)) {
             select.value = derniereCibleChoisie;
         }
 
-        // Après avoir (re)construit les options, on réaligne les deux menus
-        // pour qu'ils pointent sur la même application.
         synchroniserSelects();
     }
 
-    // Garde les deux menus déroulants (déploiement + historique) sur la même
-    // application. Quand on change l'un, l'autre suit automatiquement, et
-    // inversement.
     function synchroniserSelects(source) {
         const select = document.getElementById('select-target');
         const selectHistory = document.getElementById('select-history-target');
@@ -1245,7 +1125,6 @@
         } else if (source === 'historique') {
             select.value = selectHistory.value;
         } else {
-            // Appel initial (au chargement) : on aligne l'historique sur le déploiement.
             selectHistory.value = select.value;
         }
     }
@@ -1259,13 +1138,9 @@
         .addEventListener('change', (e) => {
             synchroniserSelects('historique');
             memoriserCibleChoisie(e.target.value);
-            afficherLigneUrlAppli(null); // URL obsolète : on efface la ligne
+            afficherLigneUrlAppli(null);
         });
 
-    // ---------- COMBO « NOM DU DÉPÔT » (étape 2) ----------
-
-    // Récupère TOUS les dépôts du compte (avec pagination), triés par nom.
-    // Renvoie un tableau d'objets dépôt, ou lève une erreur au message lisible.
     async function recupererTousLesDepots() {
         let repos = [];
         let page = 1;
@@ -1280,18 +1155,14 @@
             }
             const lot = await reponse.json();
             repos = repos.concat(lot);
-            if (lot.length < parPage) break; // Dernière page atteinte
+            if (lot.length < parPage) break;
             page++;
-            if (page > 10) break;            // Sécurité (1000 dépôts max)
+            if (page > 10) break;
         }
         repos.sort((a, b) => a.name.localeCompare(b.name));
         return repos;
     }
 
-    // Remplit le datalist (suggestions en saisie libre) ET la liste déroulante
-    // parcourable du champ « Nom du dépôt sur GitHub ».
-    // silencieux = true : aucun message affiché ni bouton touché — utilisé pour
-    // le pré-chargement automatique quand les identifiants sont déjà connus.
     async function chargerListeDepots(silencieux) {
         const select = document.getElementById('select-repo-existant');
         const datalist = document.getElementById('repos-datalist');
@@ -1310,7 +1181,6 @@
         try {
             const repos = await recupererTousLesDepots();
 
-            // Datalist : une <option> par dépôt (autocomplétion pendant la frappe)
             datalist.innerHTML = "";
             repos.forEach(r => {
                 const opt = document.createElement('option');
@@ -1318,7 +1188,6 @@
                 datalist.appendChild(opt);
             });
 
-            // Select : liste déroulante entièrement parcourable (idéale sur iPhone)
             select.innerHTML = "";
             const placeholder = document.createElement('option');
             placeholder.value = "";
@@ -1348,9 +1217,6 @@
         }
     }
 
-    // Quand on choisit un dépôt dans la liste déroulante, on recopie son nom dans
-    // le champ texte — et dans le nom d'affichage s'il est encore vide — pour
-    // pouvoir enchaîner directement sur « Ajouter cette cible ».
     function choisirDepotExistant() {
         const repo = document.getElementById('select-repo-existant').value;
         if (!repo) return;
@@ -1374,7 +1240,7 @@
 
         document.getElementById('new-target-name').value = "";
         document.getElementById('new-target-repo').value = "";
-        document.getElementById('select-repo-existant').value = ""; // Retour au libellé « choisir… »
+        document.getElementById('select-repo-existant').value = "";
         afficherMessage(`Cible "${name}" ajoutée !`, "success");
     }
 
@@ -1384,30 +1250,13 @@
         rafraichirCiblesUI();
     }
 
-    // ---------- RÉORDONNANCEMENT PAR GLISSEMENT (drag & drop) ----------
-    // On maintient la poignée « ⠿ » d'une ligne et on la glisse vers le haut ou
-    // le bas ; l'ordre est enregistré dans localStorage au relâchement.
-    //
-    // Choix technique important : on utilise ici les ÉVÉNEMENTS TACTILES natifs
-    // (touchstart/touchmove/touchend) pour le doigt, et les événements souris
-    // pour l'iMac — et NON les Pointer Events. Sur iPhone, les Pointer Events +
-    // setPointerCapture sont capricieux, et surtout Safari lançait sa propre
-    // sélection de texte (la loupe) avant qu'on puisse « saisir » la ligne.
-    // Avec les événements tactiles, un preventDefault() dès le touchstart coupe
-    // net cette sélection et le défilement, et les touchmove suivants sont
-    // toujours livrés à la poignée où le geste a commencé, même si le doigt
-    // s'en éloigne. C'est la méthode la plus fiable sur iOS.
     function activerDragCible(handle, item) {
-        // Début du glissement : on soulève la ligne et on neutralise sa capture
-        // du pointeur, pour que elementFromPoint voie la ligne SOUS le doigt.
         function debut() {
             item.classList.add('dragging');
             item.style.pointerEvents = 'none';
             document.body.classList.add('drag-actif');
         }
 
-        // Déplacement : on trouve la ligne sous le doigt/curseur et on réinsère
-        // la ligne glissée avant ou après, selon qu'on dépasse son milieu.
         function deplacer(clientX, clientY) {
             const listDiv = document.getElementById('target-list');
             const sous = document.elementFromPoint(clientX, clientY);
@@ -1419,9 +1268,6 @@
             listDiv.insertBefore(item, avant ? ligne : ligne.nextSibling);
         }
 
-        // Fin du glissement : on repose la ligne, on recalcule l'ordre du
-        // tableau à partir de l'ordre affiché (via l'index d'origine mémorisé
-        // sur chaque ligne), on enregistre, puis on redessine tout au propre.
         function fin() {
             item.classList.remove('dragging');
             item.style.pointerEvents = '';
@@ -1439,10 +1285,9 @@
             rafraichirCiblesUI();
         }
 
-        // ----- DOIGT (iPhone) : événements tactiles, non passifs -----
         handle.addEventListener('touchstart', (e) => {
-            if (e.touches.length !== 1) return; // On ignore le multi-touch
-            e.preventDefault();                 // Coupe sélection + défilement
+            if (e.touches.length !== 1) return;
+            e.preventDefault();
             debut();
 
             function onMove(ev) {
@@ -1456,17 +1301,13 @@
                 handle.removeEventListener('touchcancel', onEnd);
                 fin();
             }
-            // Les touchmove restent livrés à la poignée pour toute la durée du
-            // geste, où que parte le doigt. { passive: false } autorise le
-            // preventDefault qui bloque le défilement de la page.
             handle.addEventListener('touchmove', onMove, { passive: false });
             handle.addEventListener('touchend', onEnd);
             handle.addEventListener('touchcancel', onEnd);
         }, { passive: false });
 
-        // ----- SOURIS (iMac) -----
         handle.addEventListener('mousedown', (e) => {
-            if (e.button !== 0) return; // Bouton principal uniquement
+            if (e.button !== 0) return;
             e.preventDefault();
             debut();
 
@@ -1481,13 +1322,9 @@
         });
     }
 
-    // ---------- ÉDITION DU LIBELLÉ D'UNE CIBLE ----------
-    // Édition sur place : seul le libellé (nom d'affichage) change. Le nom du
-    // dépôt GitHub, lui, reste intact — c'est la clé qui identifie la cible.
     function modifierLibelleCible(item, index) {
         const cible = cibles[index];
         item.innerHTML = "";
-        // Pendant l'édition, on empile les éléments verticalement.
         item.style.flexDirection = 'column';
         item.style.alignItems = 'stretch';
 
@@ -1527,7 +1364,6 @@
             afficherMessage(`Libellé mis à jour : « ${nouveau} ».`, "success");
         });
 
-        // Entrée pour valider, Échap pour annuler.
         input.addEventListener('keydown', (ev) => {
             if (ev.key === 'Enter') { ev.preventDefault(); btnSave.click(); }
             else if (ev.key === 'Escape') { ev.preventDefault(); btnCancel.click(); }
@@ -1542,7 +1378,6 @@
         input.select();
     }
 
-    // Ajoute une cible sans créer de doublon, puis rafraîchit l'interface.
     function ajouterCibleAutomatique(name, repo) {
         const existe = cibles.some(c => c.repo === repo);
         if (!existe) {
@@ -1552,17 +1387,6 @@
         }
     }
 
-    // ================= SYNCHRONISATION DES CIBLES (localStorage <-> GitHub) =================
-    // Objectif : la liste des cibles est sauvegardée à l'identique à DEUX endroits
-    // redondants — le navigateur (localStorage) ET un fichier JSON dans un dépôt
-    // GitHub — et les deux copies sont maintenues cohérentes.
-    // IMPORTANT : le token n'est JAMAIS synchronisé. Le pousser dans un dépôt
-    // reviendrait à le divulguer ; il reste strictement local à l'appareil.
-    // Format identique des deux côtés : { cibles: [...], maj: "<ISO>" }.
-    // Réconciliation : l'horodatage « maj » le plus récent l'emporte (dernier
-    // écrit gagnant), ce qui fait converger les deux copies vers un état commun.
-
-    // Réglage de synchro, stocké en local : { repo, chemin }.
     function lireConfigSync() {
         try {
             const s = JSON.parse(localStorage.getItem('deployer_sync'));
@@ -1574,9 +1398,6 @@
     }
     function syncConfiguree() { return !!lireConfigSync().repo; }
 
-    // Écrit les cibles EN LOCAL (avec horodatage) et, si demandé et si la synchro
-    // est réglée, pousse aussi la copie vers GitHub (best-effort : en cas d'échec
-    // la copie locale reste la référence et on prévient l'utilisateur).
     function enregistrerCibles(pousser) {
         ciblesMaj = new Date().toISOString();
         localStorage.setItem('deployer_cibles', JSON.stringify({ cibles: cibles, derniereCible: derniereCibleChoisie, maj: ciblesMaj }));
@@ -1598,8 +1419,6 @@
         }
     }
 
-    // Lit le fichier de cibles distant. Renvoie { cibles, maj, sha } ou null si
-    // le fichier n'existe pas encore (404). Lève une erreur pour les autres cas.
     async function lireCiblesDistantes() {
         const sync = lireConfigSync();
         const url = `https://api.github.com/repos/${config.user}/${sync.repo}/contents/${encodeURIComponent(sync.chemin)}`;
@@ -1614,21 +1433,17 @@
         let obj;
         try { obj = JSON.parse(decoderBase64(data.content)); }
         catch (_) { throw new Error("Le fichier de synchro sur GitHub n'est pas un JSON valide."); }
-        // Tolère l'ancien format (tableau nu) comme en local.
         const arr = Array.isArray(obj) ? obj : (Array.isArray(obj.cibles) ? obj.cibles : []);
         const maj = Array.isArray(obj) ? null : (obj.maj || null);
         const derniereCible = Array.isArray(obj) ? null : (obj.derniereCible || null);
         return { cibles: arr, maj: maj, derniereCible: derniereCible, sha: data.sha };
     }
 
-    // Pousse la copie locale vers le fichier GitHub (création ou mise à jour).
-    // Renvoie true si l'écriture a réussi.
     async function pousserCiblesVersGithub() {
         if (!config.user || !config.token) return false;
         const sync = lireConfigSync();
         if (!sync.repo) return false;
 
-        // On garantit un horodatage, pour que les deux copies portent le même.
         if (!ciblesMaj) {
             ciblesMaj = new Date().toISOString();
             localStorage.setItem('deployer_cibles', JSON.stringify({ cibles: cibles, derniereCible: derniereCibleChoisie, maj: ciblesMaj }));
@@ -1636,7 +1451,6 @@
 
         const url = `https://api.github.com/repos/${config.user}/${sync.repo}/contents/${encodeURIComponent(sync.chemin)}`;
 
-        // Récupération du SHA si le fichier existe déjà (obligatoire pour l'écraser).
         let sha = null;
         try {
             const r = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
@@ -1658,15 +1472,12 @@
         }
     }
 
-    // Réconciliation au démarrage : compare local et distant et fait converger
-    // les deux vers la version la plus récente. Silencieux si tout est déjà aligné.
     async function synchroniserAuDemarrage() {
         if (!config.user || !config.token || !syncConfiguree()) return;
         try {
             const distant = await lireCiblesDistantes();
 
             if (!distant) {
-                // Rien en ligne : si on a des cibles locales, on crée le fichier.
                 if (cibles.length) {
                     const ok = await pousserCiblesVersGithub();
                     if (ok) afficherMessage("Copie GitHub des cibles créée à partir de ta liste locale.", "success");
@@ -1679,10 +1490,9 @@
             const memeContenu = JSON.stringify(distant.cibles) === JSON.stringify(cibles)
                 && (distant.derniereCible || '') === (derniereCibleChoisie || '');
 
-            if (memeContenu) return; // Déjà identiques : rien à faire, on ne dit rien.
+            if (memeContenu) return;
 
             if (majDistante >= majLocale) {
-                // Le distant est plus récent (ou fait autorité) : on l'adopte en local.
                 cibles = distant.cibles;
                 derniereCibleChoisie = distant.derniereCible || derniereCibleChoisie;
                 ciblesMaj = distant.maj || new Date().toISOString();
@@ -1690,22 +1500,14 @@
                 rafraichirCiblesUI();
                 afficherMessage(`Cibles récupérées depuis GitHub (${cibles.length}).`, "success");
             } else {
-                // Le local est plus récent : on met GitHub à jour.
                 const ok = await pousserCiblesVersGithub();
                 if (ok) afficherMessage("Tes cibles locales étaient plus récentes : GitHub a été mis à jour.", "success");
             }
         } catch (e) {
-            // Au démarrage on reste discret : un simple avertissement.
             afficherMessage(`Synchro GitHub indisponible au démarrage : ${e.message}`, "error");
         }
     }
 
-    // Petit utilitaire : exécute une tâche asynchrone en donnant un retour visuel
-    // SUR LE BOUTON — libellé « en cours » pendant l'exécution, puis « fait ✓ »
-    // pendant 2 s, avant de restaurer le libellé d'origine. Le bouton est
-    // désactivé le temps de la tâche. La tâche doit renvoyer false (ou lever une
-    // erreur) pour signaler un échec : dans ce cas on restaure aussitôt le
-    // libellé (les messages d'erreur détaillés sont gérés dans la tâche).
     async function boutonTache(bouton, libellePendant, libelleFait, tache) {
         const origine = bouton ? bouton.textContent : null;
         if (bouton) { bouton.disabled = true; bouton.textContent = libellePendant; }
@@ -1724,29 +1526,22 @@
         return ok;
     }
 
-    // Enregistre le réglage de synchro (dépôt + fichier) puis lance une première
-    // réconciliation. Tout le retour se fait sur le bouton, pour ne PAS laisser
-    // traîner un message « en cours » quand il n'y a rien à réconcilier.
     async function enregistrerConfigSync(bouton) {
         const repo = document.getElementById('sync-repo').value.trim();
         const chemin = document.getElementById('sync-file').value.trim() || 'cibles.json';
         localStorage.setItem('deployer_sync', JSON.stringify({ repo: repo, chemin: chemin }));
 
         if (!repo) {
-            // Synchro désactivée : retour bref sur le bouton, aucun message qui traîne.
             feedbackBouton(bouton, "Synchro désactivée", 2000);
             return;
         }
 
-        // synchroniserAuDemarrage gère elle-même ses éventuels messages (récupéré /
-        // mis à jour / erreur) ; ici on assure juste le retour « en cours » → « ✓ ».
         await boutonTache(bouton, "Réconciliation…", "Réglage enregistré ✓", async () => {
             await synchroniserAuDemarrage();
             return true;
         });
     }
 
-    // Bouton « Envoyer » : force l'écriture de la copie locale vers GitHub.
     async function envoyerCiblesManuel(bouton) {
         if (!verifierConfig()) return;
         if (!syncConfiguree()) { afficherMessage("Règle d'abord un dépôt de synchronisation à l'étape 5.", "error"); return; }
@@ -1757,7 +1552,6 @@
         });
     }
 
-    // Bouton « Récupérer » : force l'adoption de la copie GitHub en local.
     async function recupererCiblesManuel(bouton) {
         if (!verifierConfig()) return;
         if (!syncConfiguree()) { afficherMessage("Règle d'abord un dépôt de synchronisation à l'étape 5.", "error"); return; }
@@ -1778,7 +1572,6 @@
         });
     }
 
-    // Pré-remplit les champs de l'étape 5 à partir du réglage enregistré.
     function initSyncUI() {
         const s = lireConfigSync();
         const champRepo = document.getElementById('sync-repo');
@@ -1787,8 +1580,6 @@
         if (champFile) champFile.value = s.chemin || 'cibles.json';
     }
 
-    // Crée un dépôt tout neuf, y met une page de départ, active GitHub Pages,
-    // puis l'enregistre automatiquement comme cible. Tout s'enchaîne en une action.
     async function creerNouveauDepot() {
         const champNom = document.getElementById('new-repo-name');
         const repoSaisi = champNom.value.trim();
@@ -1808,11 +1599,6 @@
         });
     }
 
-    // Raccourci de la section 1 : crée un dépôt à partir du seul nom saisi
-    // (pas de nom d'affichage séparé). IMPORTANT : ce raccourci crée le dépôt
-    // GitHub uniquement — il n'ajoute JAMAIS d'entrée dans la liste « gestion
-    // des applications cibles » de la section 2, qui reste sous le contrôle
-    // exclusif du bouton « Ajouter cette cible ».
     async function creerDepotRapide() {
         const champNom = document.getElementById('quick-new-repo-name');
         const repoSaisi = champNom.value.trim();
@@ -1830,9 +1616,6 @@
         }, false);
     }
 
-    // Traduit une erreur de l'API GitHub survenue lors de la création d'un
-    // dépôt en explication compréhensible + actions concrètes à essayer.
-    // Complète le message d'erreur brut de GitHub, il ne le remplace pas.
     function diagnostiquerErreurCreationDepot(statusCode, message) {
         const m = (message || "").toLowerCase();
 
@@ -1887,12 +1670,6 @@
             "fine-grained » et réenregistre-le.";
     }
 
-    // Logique commune de création de dépôt, partagée par creerNouveauDepot()
-    // (section 2, avec nom d'affichage, AJOUTE la cible) et creerDepotRapide()
-    // (section 1, raccourci qui crée le dépôt SANS toucher à la liste des
-    // cibles — ajouterCommeCible=false). viderChamps() est appelé une fois
-    // la création réussie, pour vider les champs propres à chaque formulaire
-    // appelant.
     async function executerCreationDepot(repoSaisi, affichageSaisi, btn, viderChamps, ajouterCommeCible = true) {
         const ok = await confirmerModal(
             `Créer un nouveau dépôt nommé « ${repoSaisi} » sur ton compte GitHub ?\n\n` +
@@ -1906,7 +1683,6 @@
         btn.disabled = true;
 
         try {
-            // 1) Création du dépôt (auto_init crée un commit initial : la branche existe).
             afficherMessage("Création du dépôt sur GitHub...", "success");
             const repoResp = await fetch("https://api.github.com/user/repos", {
                 method: "POST",
@@ -1931,11 +1707,10 @@
 
             const repoData = await repoResp.json();
             const owner = repoData.owner.login;
-            const repoReel = repoData.name;              // Nom réellement retenu par GitHub
+            const repoReel = repoData.name;
             const affichage = affichageSaisi || repoReel;
             const branche = repoData.default_branch || "main";
 
-            // 2) Page de départ index.html (sinon Pages n'a rien à servir).
             afficherMessage("Ajout de la page de départ...", "success");
             const echapper = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
             const pageDepart =
@@ -1970,7 +1745,6 @@
 
             if (!putResp.ok) {
                 const e = await putResp.json();
-                // Le dépôt existe : on l'enregistre quand même comme cible (sauf raccourci rapide).
                 if (ajouterCommeCible) ajouterCibleAutomatique(affichage, repoReel);
                 const detailPut = e.message || putResp.statusText;
                 const aidePut = diagnostiquerErreurCreationDepot(putResp.status, detailPut);
@@ -1984,7 +1758,6 @@
                 return;
             }
 
-            // 3) Activation de GitHub Pages (branche par défaut, dossier racine).
             afficherMessage("Activation de GitHub Pages...", "success");
             let urlPages = `https://${owner}.github.io/${repoReel}/`;
             const pagesResp = await fetch(`https://api.github.com/repos/${owner}/${repoReel}/pages`, {
@@ -1996,13 +1769,11 @@
                 body: JSON.stringify({ source: { branch: branche, path: "/" } })
             });
 
-            const pagesOk = pagesResp.ok || pagesResp.status === 409; // 409 = déjà activé
+            const pagesOk = pagesResp.ok || pagesResp.status === 409;
             if (pagesResp.ok) {
                 try { const pd = await pagesResp.json(); if (pd.html_url) urlPages = pd.html_url; } catch (_) {}
             }
 
-            // 4) Enregistrement comme cible (sauf raccourci rapide) + nettoyage
-            // des champs propres à l'appelant.
             if (ajouterCommeCible) ajouterCibleAutomatique(affichage, repoReel);
             if (viderChamps) viderChamps();
 
@@ -2035,8 +1806,6 @@
         }
     }
 
-    // ---------- OUTILS COMMUNS ----------
-
     function headersGitHub() {
         return {
             "Authorization": `token ${config.token}`,
@@ -2044,12 +1813,10 @@
         };
     }
 
-    // Encodage texte -> Base64 (gestion des accents et émojis)
     function encoderBase64(texte) {
         return btoa(unescape(encodeURIComponent(texte)));
     }
 
-    // Décodage Base64 -> texte (l'API GitHub insère des sauts de ligne dans le Base64, on les retire)
     function decoderBase64(b64) {
         return decodeURIComponent(escape(atob(b64.replace(/\n/g, ''))));
     }
@@ -2062,14 +1829,10 @@
         return true;
     }
 
-    // Encode un chemin de fichier pour l'API Contents : chaque segment est encodé
-    // séparément (et non le chemin entier), pour que les « / » d'un sous-dossier
-    // restent des séparateurs de chemin et ne soient pas transformés en %2F.
     function encoderCheminAPI(chemin) {
         return chemin.split('/').map(encodeURIComponent).join('/');
     }
 
-    // Échappe le texte pour une insertion sûre dans du innerHTML.
     function echapperHtml(texte) {
         return String(texte)
             .replace(/&/g, "&amp;")
@@ -2078,14 +1841,6 @@
             .replace(/"/g, "&quot;");
     }
 
-    // Cherche les fichiers dont le nom ne diffère QUE par la casse (ex :
-    // « index.html » ET « Index.html »). GitHub les considère comme deux
-    // fichiers distincts, mais l'API Contents et GitHub Pages peuvent les
-    // confondre : c'est la cause typique d'un déploiement "réussi" (un commit
-    // est bien créé) qui pourtant ne change RIEN à l'écran, parce que l'écriture
-    // atterrit sur le mauvais fichier.
-    // Renvoie la liste des noms trouvés (ex : ["Index.html", "index.html"])
-    // ou null si la vérification n'a pas pu être faite.
     async function detecterDoublonsCasse(repo, nomFichier) {
         try {
             const url = `https://api.github.com/repos/${config.user}/${repo}/contents/`;
@@ -2102,20 +1857,8 @@
         }
     }
 
-    // ---------- DÉPLOIEMENT ----------
-
-    // Relit index.html en ligne et le compare, exactement, au code envoyé.
-    // Juste après une écriture, l'API GitHub peut renvoyer une version encore en
-    // cache ou pas encore propagée (contenu plus court → « ne correspond pas »),
-    // alors que le déploiement a en réalité réussi. Pour éviter cette fausse
-    // alerte, on :
-    //   1) relit au COMMIT PRÉCIS qu'on vient de créer (?ref=SHA), déterministe ;
-    //   2) RÉESSAIE plusieurs fois avec un délai croissant avant de renoncer.
-    // Renvoie { ok, detail } — ok=true dès qu'une relecture correspond.
     async function verifierContenuEnLigne(urlBase, code, shaCommitComplet, onProgres) {
         const refQuery = shaCommitComplet ? `?ref=${shaCommitComplet}` : "";
-        // Délais (ms) AVANT chaque tentative. La 1re est immédiate ; les suivantes
-        // laissent à GitHub le temps de propager (total ~14 s au pire).
         const delais = [0, 1500, 2500, 4000, 6000];
         let dernierDetail = "";
         for (let i = 0; i < delais.length; i++) {
@@ -2160,7 +1903,6 @@
             return;
         }
 
-        // Le commentaire de version est OBLIGATOIRE : au moins 3 mots.
         const nombreDeMots = commentaire.split(/\s+/).filter(m => m.length > 0).length;
         if(nombreDeMots < 3) {
             afficherMessage(
@@ -2179,8 +1921,6 @@
         const url = `https://api.github.com/repos/${config.user}/${repo}/contents/index.html`;
         let sha = null;
 
-        // Étape A : On lit index.html en ligne pour récupérer son identifiant (SHA)
-        // ET son contenu actuel. Lecture SANS cache, pour comparer avec l'état réel.
         let contenuActuel = null;
         try {
             const reponseCheck = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
@@ -2193,10 +1933,6 @@
             console.log("Nouveau fichier ou erreur de lecture", err);
         }
 
-        // Étape A bis : test anti-doublon. Si le code à envoyer est RIGOUREUSEMENT
-        // identique à ce qui est déjà en ligne, l'API Contents de GitHub ne crée
-        // AUCUN nouveau commit : elle répond "OK" sans rien changer. On te le dit
-        // franchement, au lieu d'un faux succès, et on n'envoie rien.
         if (contenuActuel !== null && contenuActuel === code) {
             afficherMessage(
                 "ℹ️ RIEN À DÉPLOYER\n\n" +
@@ -2212,16 +1948,13 @@
             return;
         }
 
-        // Étape B : Encodage propre du texte en Base64
         const codeEncode = encoderBase64(code);
 
-        // Étape C : Envoi de la mise à jour (ou création)
-        // Le commentaire de version devient le message du commit.
         const bodyPayload = {
             message: commentaire,
             content: codeEncode
         };
-        if (sha) bodyPayload.sha = sha; // Obligatoire pour une mise à jour
+        if (sha) bodyPayload.sha = sha;
 
         try {
             const reponsePut = await fetch(url, {
@@ -2230,27 +1963,18 @@
                 body: JSON.stringify(bodyPayload)
             });
 
-            // Cas 1 : l'API refuse carrément l'écriture. Message d'erreur clair, on s'arrête.
             if (!reponsePut.ok) {
                 const errData = await reponsePut.json().catch(() => ({}));
                 afficherMessage(`Échec du déploiement : ${errData.message || reponsePut.statusText}`, "error");
                 return;
             }
 
-            // À partir d'ici, le PUT a réussi : un commit A ÉTÉ créé.
-            // MAIS "commit créé" ne veut PAS dire "la bonne page a changé".
-            // C'est exactement le piège qui t'a joué des tours : succès annoncé,
-            // aucun changement à l'écran. On vérifie donc TOUT avant de fêter ça.
             const resultat = await reponsePut.json();
             const shaCommitComplet = (resultat.commit && resultat.commit.sha) ? resultat.commit.sha : null;
             const shaCommit = shaCommitComplet ? shaCommitComplet.substring(0, 7) : "inconnu";
             const cheminEcrit = (resultat.content && resultat.content.path)
                 ? resultat.content.path : "index.html";
 
-            // ---- VÉRIFICATION 1 : GitHub a-t-il écrit dans le BON fichier ? ----
-            // On a demandé « index.html ». Si GitHub répond avoir écrit dans
-            // « Index.html » (ou tout autre nom), c'est le piège de la casse :
-            // la page réellement affichée ne changera pas.
             if (cheminEcrit !== "index.html") {
                 afficherMessage(
                     "⚠️ FAUX SUCCÈS DÉTECTÉ\n\n" +
@@ -2266,13 +1990,6 @@
                 return;
             }
 
-            // ---- VÉRIFICATION 2 : relecture + comparaison caractère par caractère ----
-            // On relit le fichier réellement en ligne et on compare, exactement,
-            // avec ce que tu viens d'envoyer. C'est LA preuve que ça a marché.
-            // IMPORTANT : juste après l'écriture, l'API GitHub peut encore renvoyer
-            // une version en cache (contenu plus court, « ne correspond pas »). On
-            // relit donc au commit PRÉCIS qu'on vient de créer et on RÉESSAIE
-            // plusieurs fois avec un délai croissant avant de conclure à un échec.
             afficherMessage(`Commit ${shaCommit} créé. Vérification du contenu réellement en ligne...`, "success");
 
             const verif = await verifierContenuEnLigne(url, code, shaCommitComplet, (n, total) => {
@@ -2285,13 +2002,9 @@
             const verifOk = verif.ok;
             const detailVerif = verif.detail;
 
-            // ---- VÉRIFICATION 3 : reste-t-il des fichiers en double (casse) ? ----
-            // Même si l'écriture a réussi cette fois, un doublon qui traîne fera
-            // rater un prochain déploiement. On prévient tant qu'il existe.
             const doublons = await detecterDoublonsCasse(repo, "index.html");
             const aDoublons = Array.isArray(doublons) && doublons.length > 1;
 
-            // ---- Verdict final ----
             if (verifOk && !aDoublons) {
                 afficherMessage(
                     "✅ Déploiement VÉRIFIÉ !\n\n" +
@@ -2300,7 +2013,6 @@
                     "Ton application sera à jour sur ton iPhone d'ici 30 à 60 secondes.",
                     "success"
                 );
-                // Tout est propre : on peut vider les champs sans risque.
                 document.getElementById('html-code').value = "";
                 document.getElementById('commit-comment').value = "";
             } else if (verifOk && aDoublons) {
@@ -2314,7 +2026,6 @@
                     "Par précaution, ton code n'a PAS été effacé de la zone ci-dessus.",
                     "error"
                 );
-                // On ne vide pas les champs : on veut que tu règles le doublon d'abord.
             } else {
                 afficherMessage(
                     "⚠️ FAUX SUCCÈS POSSIBLE\n\n" +
@@ -2333,8 +2044,6 @@
         }
     }
 
-    // ---------- HISTORIQUE & RESTAURATION ----------
-
     async function chargerHistorique() {
         const repo = document.getElementById('select-history-target').value;
         const listDiv = document.getElementById('history-list');
@@ -2349,7 +2058,6 @@
         btn.disabled = true;
         listDiv.innerHTML = "<p style='color:#86868b; font-size:14px;'>Chargement de l'historique...</p>";
 
-        // On récupère les 10 derniers commits qui ont touché index.html
         const url = `https://api.github.com/repos/${config.user}/${repo}/commits?path=index.html&per_page=10`;
 
         try {
@@ -2389,7 +2097,6 @@
                         ${estActuelle ? '' : '<button class="btn-small btn-restore">Restaurer</button>'}
                     </div>`;
 
-                // On attache les actions sans passer par onclick="" pour éviter les soucis d'échappement
                 const btnVoir = item.querySelector('.btn-view');
                 attacherTooltip(btnVoir, `Affiche le contenu HTML complet de cette version du ${dateStr} dans une fenêtre séparée, sans rien modifier ni republier — pratique pour relire ou comparer avant de restaurer.`);
                 btnVoir.addEventListener('click', () => voirVersion(repo, commit.sha, dateStr));
@@ -2418,7 +2125,6 @@
         btn.disabled = false;
     }
 
-    // Récupère le contenu d'index.html tel qu'il était à un commit donné
     async function recupererContenuVersion(repo, commitSha) {
         const url = `https://api.github.com/repos/${config.user}/${repo}/contents/index.html?ref=${commitSha}`;
         const reponse = await fetch(url, { headers: headersGitHub() });
@@ -2430,7 +2136,6 @@
         return decoderBase64(donnees.content);
     }
 
-    // Ouvre l'ancienne version dans un nouvel onglet pour vérification visuelle
     async function voirVersion(repo, commitSha, dateStr) {
         try {
             afficherMessage(`Récupération de la version du ${dateStr}...`, "success");
@@ -2444,26 +2149,14 @@
         }
     }
 
-    // Copie un texte dans le presse-papier de façon robuste, en particulier sur
-    // iOS Safari. Le piège corrigé ici : navigator.clipboard EXISTE souvent sur
-    // iOS mais son writeText() REJETTE (focus, contexte, permission). L'ancien
-    // code n'utilisait le repli que si clipboard était totalement absent — sur
-    // rejet, il partait dans le catch sans jamais tenter le repli, et rien
-    // n'était copié. Ici, on RATTRAPE le rejet et on bascule vraiment sur la
-    // méthode de secours (execCommand + sélection façon iOS).
-    // Renvoie une promesse résolue à true si la copie a réussi.
     async function copierTexte(texte) {
-        // 1) API moderne — mais on rattrape son échec au lieu de le laisser filer.
         if (navigator.clipboard && navigator.clipboard.writeText) {
             try {
                 await navigator.clipboard.writeText(texte);
                 return true;
             } catch (_) {
-                // iOS a rejeté : on NE s'arrête pas, on tente le repli ci-dessous.
             }
         }
-        // 2) Méthode de secours (execCommand). La sélection via Range +
-        //    setSelectionRange est la forme qui fonctionne le mieux sur iOS.
         try {
             const zone = document.createElement('textarea');
             zone.value = texte;
@@ -2490,14 +2183,10 @@
         }
     }
 
-    // Copie le code HTML d'une version dans le presse-papier.
-    // Tout le retour se fait SUR LE BOUTON (« Copie… » pendant la récupération
-    // réseau, puis « Copié ✓ » 2 s), sans afficher le message du bas ni faire
-    // défiler la page — sauf en cas d'erreur.
     async function copierVersion(repo, commitSha, dateStr, bouton) {
         const origine = bouton ? bouton.textContent : null;
         try {
-            if (bouton) bouton.textContent = "Copie…"; // récupération en cours
+            if (bouton) bouton.textContent = "Copie…";
             const contenu = await recupererContenuVersion(repo, commitSha);
 
             const ok = await copierTexte(contenu);
@@ -2511,21 +2200,16 @@
                 return;
             }
 
-            // Succès : « Copié ✓ » pendant 2 s sur le bouton, rien en bas d'écran.
             if (bouton) {
                 bouton.textContent = "Copié ✓";
                 setTimeout(() => { bouton.textContent = origine; }, 2000);
             }
         } catch (error) {
-            if (bouton) bouton.textContent = origine; // on restaure le libellé
+            if (bouton) bouton.textContent = origine;
             afficherMessage(`Impossible de copier cette version : ${error.message}`, "error");
         }
     }
 
-    // Télécharge le code HTML d'une version, sous forme de fichier téléchargeable
-    // nommé « <nom-du-dépôt>.html ». Même récupération réseau que « Copier »,
-    // mais on déclenche un téléchargement au lieu d'écrire dans le presse-papier.
-    // Le retour se fait sur le bouton (« Préparation… » puis « Téléchargé ✓ »).
     async function telechargerVersion(repo, commitSha, dateStr, bouton) {
         const origine = bouton ? bouton.textContent : null;
         try {
@@ -2540,7 +2224,6 @@
             document.body.appendChild(lien);
             lien.click();
             document.body.removeChild(lien);
-            // Libère la mémoire une fois le téléchargement lancé.
             setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
 
             if (bouton) {
@@ -2553,12 +2236,9 @@
         }
     }
 
-    // Affiche brièvement un texte sur un bouton (ex. « Copié ✓ »), puis restaure
-    // son libellé d'origine. Sert de retour visuel discret, SANS faire défiler
-    // la page vers le message de statut du bas.
     function feedbackBouton(bouton, texte, ms) {
         if (!bouton) return;
-        if (bouton.dataset.enCours === '1') return; // Évite les chevauchements
+        if (bouton.dataset.enCours === '1') return;
         const origine = bouton.textContent;
         bouton.dataset.enCours = '1';
         bouton.textContent = texte;
@@ -2568,19 +2248,12 @@
         }, ms || 2000);
     }
 
-    // Construit l'URL GitHub Pages « attendue » d'un dépôt (repli si l'API ne
-    // renvoie pas d'adresse). Cas particulier : le dépôt « <user>.github.io »
-    // est un SITE UTILISATEUR, servi à la racine (sans le segment /repo/).
     function urlPagesDevinee(repo) {
         const user = config.user.toLowerCase();
         if (repo.toLowerCase() === `${user}.github.io`) return `https://${user}.github.io/`;
         return `https://${user}.github.io/${repo}/`;
     }
 
-    // Interroge l'API Pages du dépôt. Renvoie { html_url, status } si Pages est
-    // configuré, null si 404 (= Pages non activé), et lève pour les autres cas
-    // (droits insuffisants, réseau…). html_url est l'adresse FAISANT AUTORITÉ
-    // (gère site projet / site utilisateur / domaine personnalisé).
     async function lireInfosPages(repo) {
         const url = `https://api.github.com/repos/${config.user}/${repo}/pages`;
         const r = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
@@ -2594,14 +2267,11 @@
         return { html_url: d.html_url || null, status: d.status || null };
     }
 
-    // Affiche (ou efface) sous le bouton une ligne avec l'URL en lien cliquable,
-    // pour pouvoir l'ouvrir et vérifier que l'appli se lance bien.
-    // statut : 'building' => on prévient que la publication prend 1–2 min.
     function afficherLigneUrlAppli(url, statut) {
         const ligne = document.getElementById('url-appli-ligne');
         if (!ligne) return;
         ligne.innerHTML = "";
-        if (!url) return; // Appel sans URL = on efface la ligne
+        if (!url) return;
         const label = document.createElement('div');
         label.className = 'url-label';
         label.textContent = (statut === 'building')
@@ -2617,8 +2287,6 @@
         ligne.appendChild(lien);
     }
 
-    // Variante affichée quand Pages n'est PAS activé : on montre l'URL (barrée
-    // d'un avertissement) et un bouton pour activer Pages en un clic.
     function afficherLigneUrlAppliInactive(repo, url) {
         const ligne = document.getElementById('url-appli-ligne');
         if (!ligne) return;
@@ -2643,16 +2311,11 @@
         ligne.appendChild(btn);
     }
 
-    // Active GitHub Pages sur un dépôt existant (branche par défaut, dossier /),
-    // exactement comme le fait la création de dépôt. C'est ce qui rend l'URL
-    // github.io fonctionnelle pour une appli dont le dépôt a été créé sans Pages.
     async function activerPagesAppli(repo, bouton) {
         if (!verifierConfig()) return;
         const origine = bouton ? bouton.textContent : null;
         if (bouton) { bouton.disabled = true; bouton.textContent = "Activation…"; }
         try {
-            // On active Pages sur la branche par défaut du dépôt (là où Le
-            // Déployeur écrit index.html), dossier racine.
             let branche = "main";
             try {
                 const rr = await fetch(`https://api.github.com/repos/${config.user}/${repo}`, { headers: headersGitHub(), cache: "no-store" });
@@ -2665,7 +2328,7 @@
                 body: JSON.stringify({ source: { branch: branche, path: "/" } })
             });
 
-            if (resp.ok || resp.status === 409) { // 409 = déjà activé
+            if (resp.ok || resp.status === 409) {
                 let urlPages = urlPagesDevinee(repo);
                 if (resp.ok) { try { const pd = await resp.json(); if (pd.html_url) urlPages = pd.html_url; } catch (_) {} }
                 if (bouton) { bouton.textContent = "Activé ✓"; setTimeout(() => { bouton.textContent = origine; bouton.disabled = false; }, 2000); }
@@ -2693,12 +2356,6 @@
         }
     }
 
-    // Copie l'URL GitHub Pages de l'application sélectionnée à l'étape 4.
-    // AVANT de copier, on VÉRIFIE que Pages est bien publié pour ce dépôt :
-    // le bouton « Voir » lit directement index.html (il marche donc même sans
-    // Pages), alors que cette URL n'existe que si Pages est activé — d'où le 404
-    // possible sur certaines applis. On utilise l'adresse renvoyée par l'API
-    // (faisant autorité), et on propose d'activer Pages si ce n'est pas fait.
     async function copierUrlAppli(bouton) {
         if (!verifierConfig()) return;
         const repo = document.getElementById('select-history-target').value;
@@ -2719,8 +2376,6 @@
 
         if (bouton) { bouton.disabled = false; bouton.textContent = origine; }
 
-        // Cas 1 : Pages n'est PAS activé (404 confirmé). On ne copie pas une URL
-        // trompeuse : on explique et on propose de l'activer.
         if (!pagesActif && !erreurVerif) {
             afficherLigneUrlAppliInactive(repo, url);
             afficherMessage(
@@ -2735,8 +2390,6 @@
             return;
         }
 
-        // Cas 2 : on n'a pas pu vérifier (droits sur l'API Pages, réseau…). On
-        // copie l'URL devinée en prévenant.
         if (erreurVerif) {
             afficherLigneUrlAppli(url, statut);
             const ok = await copierTexte(url);
@@ -2748,7 +2401,6 @@
             return;
         }
 
-        // Cas 3 : Pages actif → URL réelle affichée + copiée, retour sur le bouton.
         afficherLigneUrlAppli(url, statut);
         const ok = await copierTexte(url);
         if (ok) {
@@ -2763,8 +2415,6 @@
         }
     }
 
-    // Restaure une ancienne version : on crée un NOUVEAU commit avec l'ancien contenu.
-    // L'historique reste intact, on ne perd donc jamais rien.
     async function restaurerVersion(repo, commitSha, dateStr) {
         const okRestaurer = await confirmerModal(
             `Restaurer la version du ${dateStr} ?\n\nLa version actuelle restera dans l'historique, tu pourras y revenir.`,
@@ -2778,16 +2428,13 @@
         try {
             afficherMessage("Restauration en cours...", "success");
 
-            // 1. On récupère l'ancien contenu
             const ancienContenu = await recupererContenuVersion(repo, commitSha);
 
-            // 2. On récupère le SHA du fichier actuel (obligatoire pour la mise à jour)
             const urlActuel = `https://api.github.com/repos/${config.user}/${repo}/contents/index.html`;
             const reponseActuel = await fetch(urlActuel, { headers: headersGitHub() });
             if (!reponseActuel.ok) throw new Error("Impossible de lire le fichier actuel.");
             const fichierActuel = await reponseActuel.json();
 
-            // 3. On pousse l'ancien contenu comme nouveau commit
             const reponsePut = await fetch(urlActuel, {
                 method: "PUT",
                 headers: headersGitHub(),
@@ -2804,8 +2451,6 @@
                 return;
             }
 
-            // Même logique de vérification que pour un déploiement : on confirme
-            // que le fichier réellement en ligne = l'ancien contenu qu'on restaure.
             const resultat = await reponsePut.json();
             const shaCommitComplet = (resultat.commit && resultat.commit.sha) ? resultat.commit.sha : null;
             const shaCommit = shaCommitComplet ? shaCommitComplet.substring(0, 7) : "inconnu";
@@ -2840,7 +2485,7 @@
                     "Ton application sera à jour d'ici 30 à 60 secondes.",
                     "success"
                 );
-                chargerHistorique(); // On rafraîchit la liste pour voir le nouveau commit de restauration
+                chargerHistorique();
             } else {
                 afficherMessage(
                     `⚠️ Le commit de restauration ${shaCommit} a été créé, mais la vérification ` +
@@ -2853,8 +2498,6 @@
         }
     }
 
-    // Permet de glisser-déposer un fichier .html directement sur la zone de code
-    // (fonctionne sur l'iMac ; le drag & drop de fichiers n'existe pas sur iPhone).
     function initGlisserDeposerHtml() {
         const zone = document.getElementById('html-code');
         if (!zone) return;
@@ -2862,9 +2505,6 @@
         const contientFichier = (e) => e.dataTransfer && e.dataTransfer.types &&
             Array.prototype.indexOf.call(e.dataTransfer.types, 'Files') !== -1;
 
-        // Filet de sécurité : si un fichier est lâché À CÔTÉ de la zone, on empêche
-        // le navigateur de l'ouvrir (ce qui ferait quitter la page et perdre ton
-        // travail). On ne bloque que les glissers de FICHIERS, hors de la zone.
         ['dragover', 'drop'].forEach(ev => {
             document.addEventListener(ev, (e) => {
                 if (contientFichier(e) && e.target !== zone) e.preventDefault();
@@ -2886,7 +2526,7 @@
             if (e.target === zone) zone.classList.remove('drop-actif');
         });
         zone.addEventListener('drop', (e) => {
-            if (!contientFichier(e)) return; // On laisse le drop de texte normal se faire
+            if (!contientFichier(e)) return;
             e.preventDefault();
             zone.classList.remove('drop-actif');
 
@@ -2911,18 +2551,69 @@
         });
     }
 
+    // Double-clic (iMac) / double-tap (iPhone) dans la zone de code : vide
+    // la zone. Sur iOS Safari, l'événement natif "dblclick" sur un <textarea>
+    // ne se déclenche pas toujours de façon fiable (le second tap est parfois
+    // absorbé par le placement du curseur ou la sélection de texte native) —
+    // on détecte donc nous-mêmes le double-tap à partir des événements
+    // tactiles, en plus d'écouter "dblclick" pour la souris.
+    function initDoubleClicViderZone() {
+        const zone = document.getElementById('html-code');
+        if (!zone) return;
+
+        async function viderZoneAvecConfirmation() {
+            if (!zone.value.trim()) return; // Rien à vider, pas la peine de demander
+            const ok = await confirmerModal(
+                "Vider tout le contenu de la zone de code ?\n\n" +
+                "Cela n'efface rien sur GitHub, seulement le texte affiché ici.",
+                "Vider",
+                "Annuler"
+            );
+            if (ok) {
+                zone.value = "";
+                zone.focus();
+            }
+        }
+
+        // Souris (iMac) : le double-clic natif est fiable.
+        zone.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+            viderZoneAvecConfirmation();
+        });
+
+        // Doigt (iPhone) : on reconnaît nous-mêmes deux taps rapprochés dans
+        // le temps ET dans l'espace, sans dépendre de "dblclick".
+        const DELAI_MAX_DOUBLE_TAP = 350;   // ms entre les deux taps
+        const DISTANCE_MAX_DOUBLE_TAP = 30; // px de tolérance de déplacement du doigt
+        let dernierTap = { temps: 0, x: 0, y: 0 };
+
+        zone.addEventListener('touchend', (e) => {
+            const touche = e.changedTouches && e.changedTouches[0];
+            if (!touche) return;
+            const maintenant = Date.now();
+            const x = touche.clientX, y = touche.clientY;
+
+            const delta = maintenant - dernierTap.temps;
+            const distance = Math.hypot(x - dernierTap.x, y - dernierTap.y);
+
+            if (dernierTap.temps > 0 && delta < DELAI_MAX_DOUBLE_TAP && distance < DISTANCE_MAX_DOUBLE_TAP) {
+                e.preventDefault(); // Empêche le zoom natif associé au double-tap
+                dernierTap = { temps: 0, x: 0, y: 0 }; // On repart de zéro (évite qu'un triple-tap compte double)
+                viderZoneAvecConfirmation();
+            } else {
+                dernierTap = { temps: maintenant, x, y };
+            }
+        });
+    }
+
     // Initialisation au chargement de la page
     initTooltips();
     rafraichirCiblesUI();
-    // Si les identifiants sont déjà mémorisés, on remplit la combo des dépôts
-    // en silence pour qu'elle soit prête sans action de ta part.
     chargerListeDepots(true);
-    // Réglage de synchro : on pré-remplit les champs, puis on réconcilie la
-    // liste locale avec la copie GitHub (si un dépôt de synchro est configuré).
     initSyncUI();
     synchroniserAuDemarrage();
-    // Glisser-déposer d'un fichier .html sur la zone de code (étape 3).
     initGlisserDeposerHtml();
+    initDoubleClicViderZone();
 </script>
 
 </body>
