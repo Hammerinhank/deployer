@@ -146,6 +146,7 @@
             touch-action: none;
         }
         .drag-handle:active { cursor: grabbing; background: #d1d1d6; }
+        .drag-handle.dragging { background: #0071e3; color: #fff; }
         .target-info { flex: 1; min-width: 0; word-break: break-word; }
         .target-nom { color: #0071e3; text-decoration: none; font-weight: 600; }
         .target-repo { display: block; color: #86868b; font-size: 12px; margin-top: 2px; }
@@ -336,7 +337,7 @@
 <body>
 
 <div class="container">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:12px;color:#86868b;font-weight:400;">v1.2</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:12px;color:#86868b;font-weight:400;">v1.3</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -1292,13 +1293,25 @@
     }
 
     function activerDragCible(handle, item) {
-        function debut() {
-            item.classList.add('dragging');
+        let offsetY = 0;
+
+        function debut(clientY) {
+            const rect = item.getBoundingClientRect();
+            offsetY = clientY - rect.top;
+            item.style.position = 'fixed';
+            item.style.top = rect.top + 'px';
+            item.style.left = rect.left + 'px';
+            item.style.width = rect.width + 'px';
+            item.style.zIndex = '1000';
             item.style.pointerEvents = 'none';
+            item.classList.add('dragging');
+            handle.classList.add('dragging');
             document.body.classList.add('drag-actif');
         }
 
         function deplacer(clientX, clientY) {
+            item.style.top = (clientY - offsetY) + 'px';
+
             const listDiv = document.getElementById('target-list');
             const sous = document.elementFromPoint(clientX, clientY);
             if (!sous) return;
@@ -1310,8 +1323,14 @@
         }
 
         function fin() {
-            item.classList.remove('dragging');
+            item.style.position = '';
+            item.style.top = '';
+            item.style.left = '';
+            item.style.width = '';
+            item.style.zIndex = '';
             item.style.pointerEvents = '';
+            item.classList.remove('dragging');
+            handle.classList.remove('dragging');
             document.body.classList.remove('drag-actif');
 
             const listDiv = document.getElementById('target-list');
@@ -1329,7 +1348,7 @@
         handle.addEventListener('touchstart', (e) => {
             if (e.touches.length !== 1) return;
             e.preventDefault();
-            debut();
+            debut(e.touches[0].clientY);
 
             function onMove(ev) {
                 ev.preventDefault();
@@ -1350,7 +1369,7 @@
         handle.addEventListener('mousedown', (e) => {
             if (e.button !== 0) return;
             e.preventDefault();
-            debut();
+            debut(e.clientY);
 
             function onMove(ev) { deplacer(ev.clientX, ev.clientY); }
             function onUp() {
