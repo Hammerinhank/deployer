@@ -17,10 +17,6 @@
       "repo": "app-pente"
     },
     {
-      "name": "boxinternet",
-      "repo": "boxinternet"
-    },
-    {
       "name": "Supprimer doublons",
       "repo": "Supp-doublon"
     },
@@ -35,6 +31,10 @@
     {
       "name": "creerAlbumPhoto",
       "repo": "creerAlbumPhoto"
+    },
+    {
+      "name": "boxinternet",
+      "repo": "boxinternet"
     },
     {
       "name": "vocabulaire vietnamien",
@@ -54,5 +54,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-08-09T21:55:00.908Z"
+  "maj": "2026-08-09T21:55:08.130Z"
 }
