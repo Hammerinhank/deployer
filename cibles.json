@@ -37,6 +37,10 @@
       "repo": "analyserTexteVietnamien"
     },
     {
+      "name": "boxinternet",
+      "repo": "boxinternet"
+    },
+    {
       "name": "restaurants",
       "repo": "restaurants"
     },
@@ -45,14 +49,10 @@
       "repo": "test-app"
     },
     {
-      "name": "boxinternet",
-      "repo": "boxinternet"
-    },
-    {
       "name": "Pour manipuler du code html",
       "repo": "codehtml"
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-08-09T21:49:39.271Z"
+  "maj": "2026-08-09T21:49:46.868Z"
 }
