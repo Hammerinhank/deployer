@@ -5,6 +5,10 @@
       "repo": "boxinternet"
     },
     {
+      "name": "Parkings",
+      "repo": "test-app"
+    },
+    {
       "name": "Cette appli (de déploiement)",
       "repo": "deployer"
     },
@@ -15,10 +19,6 @@
     {
       "name": "Calcul de pente",
       "repo": "app-pente"
-    },
-    {
-      "name": "Parkings",
-      "repo": "test-app"
     },
     {
       "name": "Supprimer doublons",
@@ -54,5 +54,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-08-09T21:54:09.159Z"
+  "maj": "2026-08-09T21:54:15.763Z"
 }
