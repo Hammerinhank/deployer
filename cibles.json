@@ -47,8 +47,12 @@
     {
       "name": "Pour manipuler du code html",
       "repo": "codehtml"
+    },
+    {
+      "name": "Parkings",
+      "repo": "test-app"
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-08-09T21:36:24.451Z"
+  "maj": "2026-08-09T21:38:30.634Z"
 }
