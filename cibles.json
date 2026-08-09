@@ -5,16 +5,16 @@
       "repo": "deployer"
     },
     {
+      "name": "boxinternet",
+      "repo": "boxinternet"
+    },
+    {
       "name": "Supprimer doublons",
       "repo": "Supp-doublon"
     },
     {
       "name": "Calcul de pente",
       "repo": "app-pente"
-    },
-    {
-      "name": "boxinternet",
-      "repo": "boxinternet"
     },
     {
       "name": "Tourisme",
@@ -54,5 +54,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-08-09T21:49:55.229Z"
+  "maj": "2026-08-09T21:49:58.487Z"
 }
