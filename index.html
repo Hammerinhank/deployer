@@ -161,6 +161,17 @@
             cursor: pointer;
         }
         .btn-edit-cible:active { background: #005bb5; }
+        .btn-run-cible {
+            background: #34c759;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-run-cible:active { background: #248a3d; }
         .delete-btn { flex-shrink: 0; color: #ff3b30; background: none; border: none; font-weight: bold; cursor: pointer; }
 
         .commit-item {
@@ -316,7 +327,7 @@
 <body>
 
 <div class="container">
-    <h1>🚀 Le Déployeur</h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:12px;color:#86868b;font-weight:400;">v1.1</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -1088,12 +1099,18 @@
             btnEdit.textContent = 'Edit';
             attacherTooltip(btnEdit, "Passe cette ligne en mode édition pour renommer le nom d'affichage de cette application cible (le nom du dépôt GitHub associé, lui, ne change pas).");
             btnEdit.addEventListener('click', () => modifierLibelleCible(item, index));
+            const btnRun = document.createElement('button');
+            btnRun.className = 'btn-run-cible';
+            btnRun.textContent = 'Run';
+            attacherTooltip(btnRun, "Ouvre dans un nouvel onglet l'application publiée (son adresse GitHub Pages), comme le fait « Copier l'URL de l'appli » à l'étape 4.");
+            btnRun.addEventListener('click', () => lancerApplicationCible(cible.repo));
             const btnSuppr = document.createElement('button');
             btnSuppr.className = 'delete-btn';
             btnSuppr.textContent = 'Supprimer';
             attacherTooltip(btnSuppr, "Retire cette application de la liste des cibles dans Le Déployeur uniquement. Le dépôt GitHub et son code en ligne ne sont pas touchés — seule la référence locale à cette cible disparaît (et de la synchro si tu l'envoies ensuite).");
             btnSuppr.addEventListener('click', () => supprimerCible(index));
             actions.appendChild(btnEdit);
+            actions.appendChild(btnRun);
             actions.appendChild(btnSuppr);
 
             item.appendChild(handle);
@@ -1114,6 +1131,18 @@
         }
 
         synchroniserSelects();
+    }
+
+    async function lancerApplicationCible(repo) {
+        if (!verifierConfig()) return;
+        let url = urlPagesDevinee(repo);
+        try {
+            const infos = await lireInfosPages(repo);
+            if (infos && infos.html_url) url = infos.html_url;
+        } catch (_) {
+            // Si la vérification échoue, on tente quand même l'adresse devinée.
+        }
+        window.open(url, '_blank');
     }
 
     function synchroniserSelects(source) {
