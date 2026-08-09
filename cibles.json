@@ -1,10 +1,6 @@
 {
   "cibles": [
     {
-      "name": "Mon appli de test (parkings).",
-      "repo": "test-app"
-    },
-    {
       "name": "Cette appli (de déploiement)",
       "repo": "deployer"
     },
@@ -54,5 +50,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-08-09T16:47:43.858Z"
+  "maj": "2026-08-09T21:34:22.254Z"
 }
