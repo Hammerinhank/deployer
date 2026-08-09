@@ -45,14 +45,14 @@
       "repo": "restaurants"
     },
     {
-      "name": "boxinternet",
-      "repo": "boxinternet"
-    },
-    {
       "name": "Pour manipuler du code html",
       "repo": "codehtml"
+    },
+    {
+      "name": "boxinternet",
+      "repo": "boxinternet"
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-08-09T21:55:30.949Z"
+  "maj": "2026-08-09T21:55:35.816Z"
 }
