@@ -41,12 +41,12 @@
       "repo": "restaurants"
     },
     {
-      "name": "boxinternet",
-      "repo": "boxinternet"
-    },
-    {
       "name": "Parkings",
       "repo": "test-app"
+    },
+    {
+      "name": "boxinternet",
+      "repo": "boxinternet"
     },
     {
       "name": "Pour manipuler du code html",
@@ -54,5 +54,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-08-09T21:39:29.539Z"
+  "maj": "2026-08-09T21:39:31.692Z"
 }
