@@ -9,12 +9,12 @@
       "repo": "deployer"
     },
     {
-      "name": "Supprimer doublons",
-      "repo": "Supp-doublon"
-    },
-    {
       "name": "Calcul de pente",
       "repo": "app-pente"
+    },
+    {
+      "name": "Supprimer doublons",
+      "repo": "Supp-doublon"
     },
     {
       "name": "Tourisme",
@@ -54,5 +54,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-08-09T21:50:01.526Z"
+  "maj": "2026-08-09T21:53:47.076Z"
 }
