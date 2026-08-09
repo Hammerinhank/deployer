@@ -1,12 +1,12 @@
 {
   "cibles": [
     {
-      "name": "boxinternet",
-      "repo": "boxinternet"
-    },
-    {
       "name": "Parkings",
       "repo": "test-app"
+    },
+    {
+      "name": "boxinternet",
+      "repo": "boxinternet"
     },
     {
       "name": "Cette appli (de déploiement)",
@@ -54,5 +54,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-08-09T21:54:15.763Z"
+  "maj": "2026-08-09T21:54:19.289Z"
 }
