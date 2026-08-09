@@ -13,6 +13,10 @@
       "repo": "app-pente"
     },
     {
+      "name": "boxinternet",
+      "repo": "boxinternet"
+    },
+    {
       "name": "Tourisme",
       "repo": "Tourisme"
     },
@@ -23,10 +27,6 @@
     {
       "name": "vignettes",
       "repo": "vignettes"
-    },
-    {
-      "name": "boxinternet",
-      "repo": "boxinternet"
     },
     {
       "name": "creerAlbumPhoto",
@@ -54,5 +54,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-08-09T21:49:51.558Z"
+  "maj": "2026-08-09T21:49:55.229Z"
 }
