@@ -25,6 +25,10 @@
       "repo": "vignettes"
     },
     {
+      "name": "boxinternet",
+      "repo": "boxinternet"
+    },
+    {
       "name": "creerAlbumPhoto",
       "repo": "creerAlbumPhoto"
     },
@@ -35,10 +39,6 @@
     {
       "name": "analyser Texte Vietnamien",
       "repo": "analyserTexteVietnamien"
-    },
-    {
-      "name": "boxinternet",
-      "repo": "boxinternet"
     },
     {
       "name": "restaurants",
@@ -54,5 +54,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-08-09T21:49:46.868Z"
+  "maj": "2026-08-09T21:49:51.558Z"
 }
