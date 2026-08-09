@@ -337,7 +337,7 @@
 <body>
 
 <div class="container">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:12px;color:#86868b;font-weight:400;">v1.3</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:12px;color:#86868b;font-weight:400;">v1.4</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -1286,7 +1286,17 @@
         afficherMessage(`Cible "${name}" ajoutée !`, "success");
     }
 
-    function supprimerCible(index) {
+    async function supprimerCible(index) {
+        const cible = cibles[index];
+        const ok = await confirmerModal(
+            `Supprimer « ${cible.name} » de la liste des cibles ?\n\n` +
+            "Le dépôt GitHub et son code en ligne ne seront pas touchés — seule la référence " +
+            "locale à cette cible disparaîtra (et de la synchro si tu l'envoies ensuite).",
+            "Supprimer",
+            "Annuler"
+        );
+        if (!ok) return;
+
         cibles.splice(index, 1);
         enregistrerCibles(true);
         rafraichirCiblesUI();
