@@ -17,12 +17,12 @@
       "repo": "app-pente"
     },
     {
-      "name": "Supprimer doublons",
-      "repo": "Supp-doublon"
-    },
-    {
       "name": "Audio pour jb",
       "repo": "Audio"
+    },
+    {
+      "name": "Supprimer doublons",
+      "repo": "Supp-doublon"
     },
     {
       "name": "vignettes",
@@ -54,5 +54,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-08-09T21:55:08.130Z"
+  "maj": "2026-08-09T21:55:09.265Z"
 }
