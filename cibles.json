@@ -1,12 +1,12 @@
 {
   "cibles": [
     {
-      "name": "Cette appli (de déploiement)",
-      "repo": "deployer"
-    },
-    {
       "name": "boxinternet",
       "repo": "boxinternet"
+    },
+    {
+      "name": "Cette appli (de déploiement)",
+      "repo": "deployer"
     },
     {
       "name": "Supprimer doublons",
@@ -54,5 +54,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-08-09T21:49:58.487Z"
+  "maj": "2026-08-09T21:50:01.526Z"
 }
