@@ -17,16 +17,16 @@
       "repo": "app-pente"
     },
     {
+      "name": "Parkings",
+      "repo": "test-app"
+    },
+    {
       "name": "Supprimer doublons",
       "repo": "Supp-doublon"
     },
     {
       "name": "Audio pour jb",
       "repo": "Audio"
-    },
-    {
-      "name": "Parkings",
-      "repo": "test-app"
     },
     {
       "name": "vignettes",
@@ -54,5 +54,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-08-09T21:54:05.511Z"
+  "maj": "2026-08-09T21:54:09.159Z"
 }
