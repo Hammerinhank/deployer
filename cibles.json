@@ -47,8 +47,12 @@
     {
       "name": "boxinternet",
       "repo": "boxinternet"
+    },
+    {
+      "name": "Pour manipuler du code html",
+      "repo": "codehtml"
     }
   ],
   "derniereCible": "app-pente",
-  "maj": "2026-08-08T15:11:28.839Z"
+  "maj": "2026-08-09T06:31:33.249Z"
 }
