@@ -45,14 +45,14 @@
       "repo": "boxinternet"
     },
     {
-      "name": "Pour manipuler du code html",
-      "repo": "codehtml"
-    },
-    {
       "name": "Parkings",
       "repo": "test-app"
+    },
+    {
+      "name": "Pour manipuler du code html",
+      "repo": "codehtml"
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-08-09T21:39:02.374Z"
+  "maj": "2026-08-09T21:39:04.558Z"
 }
