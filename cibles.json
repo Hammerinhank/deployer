@@ -29,16 +29,16 @@
       "repo": "vignettes"
     },
     {
+      "name": "Parkings",
+      "repo": "test-app"
+    },
+    {
       "name": "creerAlbumPhoto",
       "repo": "creerAlbumPhoto"
     },
     {
       "name": "vocabulaire vietnamien",
       "repo": "mon-projet"
-    },
-    {
-      "name": "Parkings",
-      "repo": "test-app"
     },
     {
       "name": "analyser Texte Vietnamien",
@@ -54,5 +54,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-08-09T21:53:58.602Z"
+  "maj": "2026-08-09T21:54:01.716Z"
 }
