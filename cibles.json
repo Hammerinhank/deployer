@@ -5,10 +5,6 @@
       "repo": "test-app"
     },
     {
-      "name": "boxinternet",
-      "repo": "boxinternet"
-    },
-    {
       "name": "Cette appli (de déploiement)",
       "repo": "deployer"
     },
@@ -19,6 +15,10 @@
     {
       "name": "Calcul de pente",
       "repo": "app-pente"
+    },
+    {
+      "name": "boxinternet",
+      "repo": "boxinternet"
     },
     {
       "name": "Supprimer doublons",
@@ -54,5 +54,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-08-09T21:54:21.274Z"
+  "maj": "2026-08-09T21:55:00.908Z"
 }
