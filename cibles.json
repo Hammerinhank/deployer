@@ -37,6 +37,10 @@
       "repo": "mon-projet"
     },
     {
+      "name": "Parkings",
+      "repo": "test-app"
+    },
+    {
       "name": "analyser Texte Vietnamien",
       "repo": "analyserTexteVietnamien"
     },
@@ -45,14 +49,10 @@
       "repo": "restaurants"
     },
     {
-      "name": "Parkings",
-      "repo": "test-app"
-    },
-    {
       "name": "Pour manipuler du code html",
       "repo": "codehtml"
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-08-09T21:53:50.261Z"
+  "maj": "2026-08-09T21:53:58.602Z"
 }
