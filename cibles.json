@@ -1,12 +1,12 @@
 {
   "cibles": [
     {
-      "name": "Parkings",
-      "repo": "test-app"
-    },
-    {
       "name": "Cette appli (de déploiement)",
       "repo": "deployer"
+    },
+    {
+      "name": "Parkings",
+      "repo": "test-app"
     },
     {
       "name": "Tourisme",
@@ -54,5 +54,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-08-09T21:55:35.816Z"
+  "maj": "2026-08-10T03:41:24.439Z"
 }
