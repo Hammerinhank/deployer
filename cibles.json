@@ -51,8 +51,12 @@
     {
       "name": "boxinternet",
       "repo": "boxinternet"
+    },
+    {
+      "name": "Planning des profs de Vietnamien",
+      "repo": "planningprofesseurs"
     }
   ],
   "derniereCible": "app-pente",
-  "maj": "2026-08-10T05:14:01.715Z"
+  "maj": "2026-08-10T07:27:35.468Z"
 }
