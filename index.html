@@ -343,7 +343,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.9</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.10</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -2885,6 +2885,13 @@
         textarea.style.height = '140px';
         textarea.placeholder = `Colle ici le nouveau contenu de ${chemin}…`;
 
+        const btnVider = document.createElement('button');
+        btnVider.className = 'btn';
+        btnVider.style.cssText = 'background-color:#6e6e73; margin-top:5px;';
+        btnVider.textContent = 'Vider';
+        btnVider.addEventListener('click', () => viderZoneAvecConfirmationGenerique(textarea));
+        attacherTooltip(btnVider, "Vide (après confirmation) le contenu de cette zone. Ne touche à rien sur GitHub — seulement au texte affiché ici. Le double-clic (ou double-tap) sur la zone fait la même chose.");
+
         const inputCommentaire = document.createElement('input');
         inputCommentaire.type = 'text';
         inputCommentaire.className = 'commentaire-fichier';
@@ -2900,6 +2907,7 @@
         card.appendChild(label);
         card.appendChild(sousLabel);
         card.appendChild(textarea);
+        card.appendChild(btnVider);
         card.appendChild(inputCommentaire);
         card.appendChild(btnDeployer);
 
@@ -2948,23 +2956,23 @@
         });
     }
 
-    function activerDoubleClicViderGenerique(zone) {
-        async function viderAvecConfirmation() {
-            if (!zone.value.trim()) return;
-            const ok = await confirmerModal(
-                "Vider tout le contenu de cette zone ?\n\nCela n'efface rien sur GitHub, seulement le texte affiché ici.",
-                "Vider",
-                "Annuler"
-            );
-            if (ok) {
-                zone.value = "";
-                zone.focus();
-            }
+    async function viderZoneAvecConfirmationGenerique(zone) {
+        if (!zone.value.trim()) return;
+        const ok = await confirmerModal(
+            "Vider tout le contenu de cette zone ?\n\nCela n'efface rien sur GitHub, seulement le texte affiché ici.",
+            "Vider",
+            "Annuler"
+        );
+        if (ok) {
+            zone.value = "";
+            zone.focus();
         }
+    }
 
+    function activerDoubleClicViderGenerique(zone) {
         zone.addEventListener('dblclick', (e) => {
             e.preventDefault();
-            viderAvecConfirmation();
+            viderZoneAvecConfirmationGenerique(zone);
         });
 
         const DELAI_MAX_DOUBLE_TAP = 350;
@@ -2983,7 +2991,7 @@
             if (dernierTap.temps > 0 && delta < DELAI_MAX_DOUBLE_TAP && distance < DISTANCE_MAX_DOUBLE_TAP) {
                 e.preventDefault();
                 dernierTap = { temps: 0, x: 0, y: 0 };
-                viderAvecConfirmation();
+                viderZoneAvecConfirmationGenerique(zone);
             } else {
                 dernierTap = { temps: maintenant, x, y };
             }
