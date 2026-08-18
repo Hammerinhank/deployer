@@ -343,7 +343,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.7</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.8</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -1122,7 +1122,12 @@
     function mettreAJourBoutonAutresFichiers() {
         const btn = document.getElementById('btn-autres-fichiers');
         if (!btn) return;
-        btn.style.display = depotsSelectionnes.size > 0 ? 'block' : 'none';
+        const selectDeploiement = document.getElementById('select-target');
+        const selectHistorique = document.getElementById('select-history-target');
+        const repoDeploiement = selectDeploiement ? selectDeploiement.value : '';
+        const repoHistorique = selectHistorique ? selectHistorique.value : '';
+        const visible = depotsSelectionnes.has(repoDeploiement) || depotsSelectionnes.has(repoHistorique);
+        btn.style.display = visible ? 'block' : 'none';
     }
 
     function rafraichirCiblesUI() {
@@ -1148,7 +1153,7 @@
             checkbox.type = 'checkbox';
             checkbox.className = 'target-checkbox';
             checkbox.checked = depotsSelectionnes.has(cible.repo);
-            attacherTooltip(checkbox, "Coche cette application pour l'inclure dans la mise à jour groupée des fichiers autres que le HTML (bouton « Gérer les autres fichiers » qui apparaît à l'étape 3 dès qu'au moins une case est cochée).");
+            attacherTooltip(checkbox, "Coche cette application pour l'inclure dans la mise à jour groupée des fichiers autres que le HTML. Le bouton « Gérer les autres fichiers » apparaît à l'étape 3 dès que cette application est sélectionnée dans le menu déroulant de l'étape 3 (Déploiement) ou de l'étape 4 (Historique).");
             checkbox.addEventListener('change', () => toggleSelectionDepot(cible.repo, checkbox.checked));
 
             const handle = document.createElement('span');
@@ -1245,11 +1250,13 @@
         .addEventListener('change', (e) => {
             synchroniserSelects('deploiement');
             memoriserCibleChoisie(e.target.value);
+            mettreAJourBoutonAutresFichiers();
         });
     document.getElementById('select-history-target')
         .addEventListener('change', (e) => {
             synchroniserSelects('historique');
             memoriserCibleChoisie(e.target.value);
+            mettreAJourBoutonAutresFichiers();
             afficherLigneUrlAppli(null);
         });
 
