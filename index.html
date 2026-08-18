@@ -343,7 +343,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.6</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.7</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -495,7 +495,8 @@
             un commentaire de version (obligatoire, 3 mots minimum), puis clique sur « Mettre à jour
             sur GitHub » pour ce fichier précis. Double-clic (ou double-tap) sur une zone pour la vider.
         </p>
-        <div id="autres-fichiers-contenu"></div>
+        <button class="btn" id="btn-dupliquer-commentaire" onclick="dupliquerCommentaireHtml()" style="background-color: #ff9500;" data-tip="Va chercher, pour chaque dépôt affiché ci-dessous, le commentaire du dernier commit fait sur son fichier index.html, et remplit avec ce texte tous les champs « Commentaire de version » de ce dépôt sur cette page. Pratique quand tu déploies plusieurs fichiers en même temps que le HTML avec le même commentaire — chaque champ reste ensuite modifiable individuellement si besoin.">📋 Dupliquer commentaire de l'HTML</button>
+        <div id="autres-fichiers-contenu" style="margin-top: 15px;"></div>
     </div>
 </div>
 
@@ -2770,6 +2771,7 @@
         for (const cible of reposAtraiter) {
             const blocRepo = document.createElement('div');
             blocRepo.style.marginBottom = '25px';
+            blocRepo.dataset.repo = cible.repo;
 
             const titre = document.createElement('h2');
             titre.style.cssText = 'font-size:15px; border-bottom:1px solid #e5e5ea; padding-bottom:8px;';
@@ -2814,6 +2816,55 @@
         }
     }
 
+    async function dupliquerCommentaireHtml() {
+        if (!verifierConfig()) return;
+
+        const blocs = document.querySelectorAll('#autres-fichiers-contenu [data-repo]');
+        if (blocs.length === 0) {
+            afficherMessage("Aucun fichier chargé pour l'instant.", "error");
+            return;
+        }
+
+        const btn = document.getElementById('btn-dupliquer-commentaire');
+        const origine = btn ? btn.textContent : null;
+        if (btn) { btn.disabled = true; btn.textContent = "Récupération…"; }
+
+        let nbReussis = 0;
+        const echecs = [];
+
+        for (const bloc of blocs) {
+            const repo = bloc.dataset.repo;
+            try {
+                const commits = await recupererCommitsFichier(repo, 'index.html', 1);
+                if (commits && commits.length > 0) {
+                    const commentaire = commits[0].commit.message;
+                    const champs = bloc.querySelectorAll('.commentaire-fichier');
+                    champs.forEach(champ => { champ.value = commentaire; });
+                    nbReussis++;
+                } else {
+                    echecs.push(`${repo} (aucun commit trouvé sur index.html)`);
+                }
+            } catch (e) {
+                echecs.push(`${repo} (${e.message})`);
+            }
+        }
+
+        if (btn) { btn.disabled = false; btn.textContent = origine; }
+
+        if (echecs.length === 0) {
+            afficherMessage(
+                `✅ Commentaires dupliqués depuis le dernier commit du fichier HTML de ${nbReussis} dépôt(s).`,
+                "success"
+            );
+        } else {
+            afficherMessage(
+                `Commentaires dupliqués pour ${nbReussis} dépôt(s).\n\n` +
+                `⚠️ Échec pour :\n${echecs.join("\n")}`,
+                "error"
+            );
+        }
+    }
+
     function construireCarteFichier(repo, chemin, branche) {
         const card = document.createElement('div');
         card.className = 'card';
@@ -2833,6 +2884,7 @@
 
         const inputCommentaire = document.createElement('input');
         inputCommentaire.type = 'text';
+        inputCommentaire.className = 'commentaire-fichier';
         inputCommentaire.placeholder = 'Commentaire de version (obligatoire, 3 mots minimum)';
         inputCommentaire.style.marginTop = '10px';
 
