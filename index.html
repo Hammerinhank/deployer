@@ -121,6 +121,12 @@
             user-select: text;
             -webkit-touch-callout: default;
         }
+        .target-checkbox {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+            margin: 0;
+        }
         .target-item.dragging {
             opacity: 0.9;
             background: #eaf3ff;
@@ -336,8 +342,8 @@
 </head>
 <body>
 
-<div class="container">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.5</span></h1>
+<div class="container" id="page-principale">
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.6</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -377,6 +383,10 @@
         <details class="section-repliable">
             <summary><h2>2. Gestion des Applications Cibles</h2></summary>
             <div class="section-contenu">
+                <p style="font-size: 12px; color: #86868b; margin-top: 0;">
+                    Coche une ou plusieurs applications ci-dessous pour activer, à l'étape 3, la mise
+                    à jour groupée de leurs fichiers autres que le HTML.
+                </p>
                 <div id="target-list"></div>
                 <hr style="border: 0; border-top: 1px solid #e5e5ea; margin: 15px 0;">
                 <label for="new-target-name">Nom de l'application (Affichage)</label>
@@ -422,6 +432,7 @@
         <input type="text" id="commit-comment" placeholder="Ex : Ajout du bouton de partage" autocomplete="off">
 
         <button class="btn" onclick="deployerCode()" style="background-color: #5856d6;" data-tip="Envoie le contenu de la zone de code ci-dessus comme nouvelle version (un nouveau commit) du fichier index.html de l'application cible sélectionnée. Le commentaire de version est obligatoire et apparaîtra dans l'historique (section 4). Une vérification automatique confirme ensuite que le fichier réellement en ligne correspond bien à ce qui vient d'être envoyé.">Mettre à jour sur GitHub</button>
+        <button class="btn" id="btn-autres-fichiers" onclick="ouvrirPageAutresFichiers()" style="display:none; background-color: #5856d6; margin-top: 10px;" data-tip="Ouvre un écran séparé listant, pour chaque application cochée à l'étape 2, tous les fichiers du dépôt autres que le fichier HTML. Permet de mettre à jour ces fichiers un par un sur GitHub, avec la même logique que ci-dessus (copier-coller ou glisser-déposer, double-clic pour vider).">📁 Gérer les autres fichiers (dépôts cochés)</button>
     </div>
 
     <!-- 4. HISTORIQUE & RESTAURATION -->
@@ -471,6 +482,21 @@
     <!-- ZONE DE STATUS -->
     <div id="status-box" class="status"></div>
     <div id="status-actions" style="display: none; margin-top: 10px;"></div>
+</div>
+
+<!-- 6. PAGE : MISE À JOUR DES AUTRES FICHIERS (masquée par défaut) -->
+<div class="container" id="page-autres-fichiers" style="display:none;">
+    <div class="card">
+        <button class="btn" onclick="fermerPageAutresFichiers()" style="background-color: #6e6e73;">⬅ Retour au Déployeur</button>
+        <h2 style="margin-top: 15px;">📁 Mise à jour des autres fichiers</h2>
+        <p style="font-size: 13px; color: #86868b; margin-top: 0;">
+            Pour chaque application cochée à l'étape 2 : liste des fichiers du dépôt autres que le
+            fichier HTML. Colle le nouveau contenu ou glisse-dépose un fichier sur une zone, ajoute
+            un commentaire de version (obligatoire, 3 mots minimum), puis clique sur « Mettre à jour
+            sur GitHub » pour ce fichier précis. Double-clic (ou double-tap) sur une zone pour la vider.
+        </p>
+        <div id="autres-fichiers-contenu"></div>
+    </div>
 </div>
 
 <!-- Fenêtre de confirmation intégrée -->
@@ -569,6 +595,7 @@
     let cibles = [];
     let ciblesMaj = null;
     let derniereCibleChoisie = localStorage.getItem('deployer_derniere_cible') || '';
+    let depotsSelectionnes = new Set();
     (function chargerCiblesLocal() {
         const brut = localStorage.getItem('deployer_cibles');
         if (!brut) return;
@@ -878,6 +905,24 @@
         return { fichiers, tronque: !!data.truncated };
     }
 
+    async function listerFichiersHorsHtml(repo, branche) {
+        const url = `https://api.github.com/repos/${config.user}/${repo}/git/trees/${encodeURIComponent(branche)}?recursive=1`;
+        const rep = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
+        if (!rep.ok) {
+            let detail = `${rep.status} ${rep.statusText}`;
+            try { const e = await rep.json(); if (e && e.message) detail = e.message; } catch (_) {}
+            throw new Error(detail);
+        }
+        const data = await rep.json();
+        if (!Array.isArray(data.tree)) return { fichiers: [], tronque: false };
+        const fichiers = data.tree
+            .filter(f => f.type === 'blob'
+                && !f.path.toLowerCase().endsWith('.html')
+                && !f.path.toLowerCase().endsWith('.htm'))
+            .map(f => f.path);
+        return { fichiers, tronque: !!data.truncated };
+    }
+
     async function recupererCommitsFichier(repo, chemin, limite) {
         const url = `https://api.github.com/repos/${config.user}/${repo}/commits?path=${encodeURIComponent(chemin)}&per_page=${limite}`;
         const rep = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
@@ -1067,10 +1112,25 @@
         }
     }
 
+    function toggleSelectionDepot(repo, coche) {
+        if (coche) depotsSelectionnes.add(repo);
+        else depotsSelectionnes.delete(repo);
+        mettreAJourBoutonAutresFichiers();
+    }
+
+    function mettreAJourBoutonAutresFichiers() {
+        const btn = document.getElementById('btn-autres-fichiers');
+        if (!btn) return;
+        btn.style.display = depotsSelectionnes.size > 0 ? 'block' : 'none';
+    }
+
     function rafraichirCiblesUI() {
         const listDiv = document.getElementById('target-list');
         const select = document.getElementById('select-target');
         const selectHistory = document.getElementById('select-history-target');
+
+        // On ne garde dans la sélection que les dépôts qui existent encore.
+        depotsSelectionnes = new Set([...depotsSelectionnes].filter(r => cibles.some(c => c.repo === r)));
         
         listDiv.innerHTML = cibles.length === 0 ? "<p style='color:#86868b; font-size:14px; margin:0;'>Aucune cible enregistrée.</p>" : "";
         select.innerHTML = "";
@@ -1082,6 +1142,13 @@
             const item = document.createElement('div');
             item.className = 'target-item';
             item.dataset.index = index;
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'target-checkbox';
+            checkbox.checked = depotsSelectionnes.has(cible.repo);
+            attacherTooltip(checkbox, "Coche cette application pour l'inclure dans la mise à jour groupée des fichiers autres que le HTML (bouton « Gérer les autres fichiers » qui apparaît à l'étape 3 dès qu'au moins une case est cochée).");
+            checkbox.addEventListener('change', () => toggleSelectionDepot(cible.repo, checkbox.checked));
 
             const handle = document.createElement('span');
             handle.className = 'drag-handle';
@@ -1126,6 +1193,7 @@
             actions.appendChild(pileEditRun);
             actions.appendChild(btnSuppr);
 
+            item.appendChild(checkbox);
             item.appendChild(handle);
             item.appendChild(info);
             item.appendChild(actions);
@@ -1144,6 +1212,7 @@
         }
 
         synchroniserSelects();
+        mettreAJourBoutonAutresFichiers();
     }
 
     async function lancerApplicationCible(repo) {
@@ -2674,6 +2743,285 @@
                 dernierTap = { temps: maintenant, x, y };
             }
         });
+    }
+
+    // ————— Section 6 : mise à jour des fichiers autres que le HTML —————
+
+    function fermerPageAutresFichiers() {
+        document.getElementById('page-autres-fichiers').style.display = 'none';
+        document.getElementById('page-principale').style.display = 'block';
+    }
+
+    async function ouvrirPageAutresFichiers() {
+        if (!verifierConfig()) return;
+        if (depotsSelectionnes.size === 0) return;
+
+        document.getElementById('page-principale').style.display = 'none';
+        const pagePlein = document.getElementById('page-autres-fichiers');
+        pagePlein.style.display = 'block';
+        window.scrollTo(0, 0);
+
+        const zone = document.getElementById('autres-fichiers-contenu');
+        zone.innerHTML = "<p style='color:#86868b; font-size:14px;'>Chargement des fichiers…</p>";
+
+        const reposAtraiter = cibles.filter(c => depotsSelectionnes.has(c.repo));
+        zone.innerHTML = "";
+
+        for (const cible of reposAtraiter) {
+            const blocRepo = document.createElement('div');
+            blocRepo.style.marginBottom = '25px';
+
+            const titre = document.createElement('h2');
+            titre.style.cssText = 'font-size:15px; border-bottom:1px solid #e5e5ea; padding-bottom:8px;';
+            titre.textContent = `${cible.name} (${cible.repo})`;
+            blocRepo.appendChild(titre);
+
+            let branche = 'main';
+            try {
+                const rr = await fetch(`https://api.github.com/repos/${config.user}/${cible.repo}`, { headers: headersGitHub(), cache: "no-store" });
+                if (rr.ok) { const dd = await rr.json(); branche = dd.default_branch || 'main'; }
+            } catch (_) {}
+
+            try {
+                const resultatArbre = await listerFichiersHorsHtml(cible.repo, branche);
+                const fichiers = resultatArbre.fichiers;
+
+                if (resultatArbre.tronque) {
+                    const avert = document.createElement('p');
+                    avert.style.cssText = 'color:#c62828; font-size:12px;';
+                    avert.textContent = "⚠️ La liste des fichiers de ce dépôt est peut-être incomplète (arbre trop volumineux).";
+                    blocRepo.appendChild(avert);
+                }
+
+                if (fichiers.length === 0) {
+                    const vide = document.createElement('p');
+                    vide.style.cssText = 'color:#86868b; font-size:13px;';
+                    vide.textContent = "Aucun fichier autre que le HTML dans ce dépôt.";
+                    blocRepo.appendChild(vide);
+                } else {
+                    fichiers.forEach(chemin => {
+                        blocRepo.appendChild(construireCarteFichier(cible.repo, chemin, branche));
+                    });
+                }
+            } catch (e) {
+                const err = document.createElement('p');
+                err.style.cssText = 'color:#c62828; font-size:13px; font-weight:600;';
+                err.textContent = `Erreur lors du listage des fichiers : ${e.message}`;
+                blocRepo.appendChild(err);
+            }
+
+            zone.appendChild(blocRepo);
+        }
+    }
+
+    function construireCarteFichier(repo, chemin, branche) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.style.marginBottom = '15px';
+
+        const label = document.createElement('div');
+        label.textContent = chemin;
+        label.style.cssText = 'font-size:14px; color:#1d1d1f; font-weight:700; margin-bottom:5px;';
+
+        const sousLabel = document.createElement('div');
+        sousLabel.style.cssText = 'font-size:12px; color:#86868b; margin-bottom:10px;';
+        sousLabel.textContent = "Colle le nouveau contenu, ou glisse-dépose un fichier sur la zone — double-clic (ou double-tap) pour la vider.";
+
+        const textarea = document.createElement('textarea');
+        textarea.style.height = '140px';
+        textarea.placeholder = `Colle ici le nouveau contenu de ${chemin}…`;
+
+        const inputCommentaire = document.createElement('input');
+        inputCommentaire.type = 'text';
+        inputCommentaire.placeholder = 'Commentaire de version (obligatoire, 3 mots minimum)';
+        inputCommentaire.style.marginTop = '10px';
+
+        const btnDeployer = document.createElement('button');
+        btnDeployer.className = 'btn';
+        btnDeployer.style.cssText = 'background-color:#5856d6; margin-top:5px;';
+        btnDeployer.textContent = 'Mettre à jour sur GitHub';
+        btnDeployer.addEventListener('click', () => deployerFichierGenerique(repo, chemin, branche, textarea, inputCommentaire, btnDeployer));
+
+        card.appendChild(label);
+        card.appendChild(sousLabel);
+        card.appendChild(textarea);
+        card.appendChild(inputCommentaire);
+        card.appendChild(btnDeployer);
+
+        activerGlisserDeposerGenerique(textarea);
+        activerDoubleClicViderGenerique(textarea);
+
+        return card;
+    }
+
+    function activerGlisserDeposerGenerique(zone) {
+        const contientFichier = (e) => e.dataTransfer && e.dataTransfer.types &&
+            Array.prototype.indexOf.call(e.dataTransfer.types, 'Files') !== -1;
+
+        zone.addEventListener('dragenter', (e) => {
+            if (!contientFichier(e)) return;
+            e.preventDefault();
+            zone.classList.add('drop-actif');
+        });
+        zone.addEventListener('dragover', (e) => {
+            if (!contientFichier(e)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            zone.classList.add('drop-actif');
+        });
+        zone.addEventListener('dragleave', (e) => {
+            if (e.target === zone) zone.classList.remove('drop-actif');
+        });
+        zone.addEventListener('drop', (e) => {
+            if (!contientFichier(e)) return;
+            e.preventDefault();
+            zone.classList.remove('drop-actif');
+
+            const fichier = e.dataTransfer.files[0];
+            if (!fichier) return;
+
+            const lecteur = new FileReader();
+            lecteur.onload = () => {
+                zone.value = lecteur.result;
+                afficherMessage(
+                    `Fichier « ${fichier.name} » chargé dans la zone.\n\nN'oublie pas le commentaire de version, puis « Mettre à jour sur GitHub ».`,
+                    "success"
+                );
+            };
+            lecteur.onerror = () => afficherMessage(`Impossible de lire le fichier « ${fichier.name} ».`, "error");
+            lecteur.readAsText(fichier);
+        });
+    }
+
+    function activerDoubleClicViderGenerique(zone) {
+        async function viderAvecConfirmation() {
+            if (!zone.value.trim()) return;
+            const ok = await confirmerModal(
+                "Vider tout le contenu de cette zone ?\n\nCela n'efface rien sur GitHub, seulement le texte affiché ici.",
+                "Vider",
+                "Annuler"
+            );
+            if (ok) {
+                zone.value = "";
+                zone.focus();
+            }
+        }
+
+        zone.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+            viderAvecConfirmation();
+        });
+
+        const DELAI_MAX_DOUBLE_TAP = 350;
+        const DISTANCE_MAX_DOUBLE_TAP = 30;
+        let dernierTap = { temps: 0, x: 0, y: 0 };
+
+        zone.addEventListener('touchend', (e) => {
+            const touche = e.changedTouches && e.changedTouches[0];
+            if (!touche) return;
+            const maintenant = Date.now();
+            const x = touche.clientX, y = touche.clientY;
+
+            const delta = maintenant - dernierTap.temps;
+            const distance = Math.hypot(x - dernierTap.x, y - dernierTap.y);
+
+            if (dernierTap.temps > 0 && delta < DELAI_MAX_DOUBLE_TAP && distance < DISTANCE_MAX_DOUBLE_TAP) {
+                e.preventDefault();
+                dernierTap = { temps: 0, x: 0, y: 0 };
+                viderAvecConfirmation();
+            } else {
+                dernierTap = { temps: maintenant, x, y };
+            }
+        });
+    }
+
+    async function deployerFichierGenerique(repo, chemin, branche, textarea, inputCommentaire, bouton) {
+        const code = textarea.value;
+        const commentaire = inputCommentaire.value.trim();
+
+        if (!verifierConfig()) return;
+        if (!code.trim()) {
+            afficherMessage(`Erreur : la zone de texte pour « ${chemin} » est vide.`, "error");
+            return;
+        }
+
+        const nombreDeMots = commentaire.split(/\s+/).filter(m => m.length > 0).length;
+        if (nombreDeMots < 3) {
+            afficherMessage(
+                `⛔ COMMENTAIRE OBLIGATOIRE pour « ${chemin} »\n\n` +
+                "Décris en quelques mots (au moins 3) ce que change cette version.",
+                "error"
+            );
+            inputCommentaire.focus();
+            return;
+        }
+
+        bouton.disabled = true;
+        const origineBouton = bouton.textContent;
+        bouton.textContent = "Vérification…";
+
+        const url = `https://api.github.com/repos/${config.user}/${repo}/contents/${encoderCheminAPI(chemin)}`;
+        let sha = null;
+        let contenuActuel = null;
+        try {
+            const reponseCheck = await fetch(url + `?ref=${encodeURIComponent(branche)}`, { headers: headersGitHub(), cache: "no-store" });
+            if (reponseCheck.ok) {
+                const donneesFile = await reponseCheck.json();
+                sha = donneesFile.sha;
+                try { contenuActuel = decoderBase64(donneesFile.content); } catch (_) { contenuActuel = null; }
+            }
+        } catch (err) {}
+
+        if (contenuActuel !== null && contenuActuel === code) {
+            afficherMessage(`ℹ️ RIEN À DÉPLOYER pour « ${chemin} » — le contenu envoyé est identique à celui déjà en ligne.`, "error");
+            bouton.disabled = false;
+            bouton.textContent = origineBouton;
+            return;
+        }
+
+        const bodyPayload = { message: commentaire, content: encoderBase64(code), branch: branche };
+        if (sha) bodyPayload.sha = sha;
+
+        try {
+            bouton.textContent = "Envoi…";
+            const reponsePut = await fetch(url, { method: "PUT", headers: headersGitHub(), body: JSON.stringify(bodyPayload) });
+            if (!reponsePut.ok) {
+                const errData = await reponsePut.json().catch(() => ({}));
+                afficherMessage(`Échec de la mise à jour de « ${chemin} » : ${errData.message || reponsePut.statusText}`, "error");
+                bouton.disabled = false;
+                bouton.textContent = origineBouton;
+                return;
+            }
+
+            const resultat = await reponsePut.json();
+            const shaCommitComplet = (resultat.commit && resultat.commit.sha) ? resultat.commit.sha : null;
+            const shaCommit = shaCommitComplet ? shaCommitComplet.substring(0, 7) : "inconnu";
+
+            bouton.textContent = "Vérification…";
+            const verif = await verifierContenuEnLigne(url, code, shaCommitComplet, (n, total) => {
+                bouton.textContent = `Vérif. ${n}/${total}…`;
+            });
+
+            if (verif.ok) {
+                afficherMessage(`✅ « ${chemin} » mis à jour et VÉRIFIÉ (commit ${shaCommit}) dans « ${repo} ».`, "success");
+                textarea.value = "";
+                inputCommentaire.value = "";
+                bouton.textContent = "Mis à jour ✓";
+                setTimeout(() => { bouton.textContent = origineBouton; bouton.disabled = false; }, 2000);
+            } else {
+                afficherMessage(
+                    `⚠️ FAUX SUCCÈS POSSIBLE pour « ${chemin} »\n\n` +
+                    `Commit ${shaCommit} créé, mais la vérification du contenu en ligne a échoué :\n${verif.detail}`,
+                    "error"
+                );
+                bouton.disabled = false;
+                bouton.textContent = origineBouton;
+            }
+        } catch (error) {
+            afficherMessage(`Erreur réseau pour « ${chemin} » : ${error.message}`, "error");
+            bouton.disabled = false;
+            bouton.textContent = origineBouton;
+        }
     }
 
     // Initialisation au chargement de la page
