@@ -58,9 +58,10 @@
     },
     {
       "name": "anniversaires",
-      "repo": "anniversaires"
+      "repo": "anniversaires",
+      "coche": true
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-08-18T01:17:37.138Z"
+  "maj": "2026-08-18T01:18:37.482Z"
 }
