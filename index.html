@@ -343,7 +343,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.8</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.9</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -461,9 +461,9 @@
                 </p>
                 <p style="font-size: 13px; color: #c62828; margin-top: 0;">
                     🔒 Ton token n'est <strong>jamais</strong> synchronisé : il reste uniquement dans
-                    ce navigateur. Seule la liste des cibles (noms d'affichage + noms de dépôts) part
-                    sur GitHub. Tu peux d'ailleurs utiliser un dépôt <strong>privé</strong> pour cette
-                    sauvegarde.
+                    ce navigateur. Seule la liste des cibles (noms d'affichage, noms de dépôts et cases
+                    cochées à l'étape 2) part sur GitHub. Tu peux d'ailleurs utiliser un dépôt
+                    <strong>privé</strong> pour cette sauvegarde.
                 </p>
 
                 <label for="sync-repo">Dépôt de sauvegarde (doit déjà exister)</label>
@@ -596,7 +596,6 @@
     let cibles = [];
     let ciblesMaj = null;
     let derniereCibleChoisie = localStorage.getItem('deployer_derniere_cible') || '';
-    let depotsSelectionnes = new Set();
     (function chargerCiblesLocal() {
         const brut = localStorage.getItem('deployer_cibles');
         if (!brut) return;
@@ -1113,9 +1112,10 @@
         }
     }
 
-    function toggleSelectionDepot(repo, coche) {
-        if (coche) depotsSelectionnes.add(repo);
-        else depotsSelectionnes.delete(repo);
+    function toggleSelectionDepot(index, coche) {
+        if (!cibles[index]) return;
+        cibles[index].coche = coche;
+        enregistrerCibles(true);
         mettreAJourBoutonAutresFichiers();
     }
 
@@ -1126,7 +1126,7 @@
         const selectHistorique = document.getElementById('select-history-target');
         const repoDeploiement = selectDeploiement ? selectDeploiement.value : '';
         const repoHistorique = selectHistorique ? selectHistorique.value : '';
-        const visible = depotsSelectionnes.has(repoDeploiement) || depotsSelectionnes.has(repoHistorique);
+        const visible = cibles.some(c => c.coche && (c.repo === repoDeploiement || c.repo === repoHistorique));
         btn.style.display = visible ? 'block' : 'none';
     }
 
@@ -1135,9 +1135,6 @@
         const select = document.getElementById('select-target');
         const selectHistory = document.getElementById('select-history-target');
 
-        // On ne garde dans la sélection que les dépôts qui existent encore.
-        depotsSelectionnes = new Set([...depotsSelectionnes].filter(r => cibles.some(c => c.repo === r)));
-        
         listDiv.innerHTML = cibles.length === 0 ? "<p style='color:#86868b; font-size:14px; margin:0;'>Aucune cible enregistrée.</p>" : "";
         select.innerHTML = "";
         selectHistory.innerHTML = "";
@@ -1152,9 +1149,9 @@
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.className = 'target-checkbox';
-            checkbox.checked = depotsSelectionnes.has(cible.repo);
-            attacherTooltip(checkbox, "Coche cette application pour l'inclure dans la mise à jour groupée des fichiers autres que le HTML. Le bouton « Gérer les autres fichiers » apparaît à l'étape 3 dès que cette application est sélectionnée dans le menu déroulant de l'étape 3 (Déploiement) ou de l'étape 4 (Historique).");
-            checkbox.addEventListener('change', () => toggleSelectionDepot(cible.repo, checkbox.checked));
+            checkbox.checked = !!cible.coche;
+            attacherTooltip(checkbox, "Coche cette application pour l'inclure dans la mise à jour groupée des fichiers autres que le HTML. Le bouton « Gérer les autres fichiers » apparaît à l'étape 3 dès que cette application est sélectionnée dans le menu déroulant de l'étape 3 (Déploiement) ou de l'étape 4 (Historique). Cette case est mémorisée comme le reste de la liste des cibles (local + synchro GitHub, section 5).");
+            checkbox.addEventListener('change', () => toggleSelectionDepot(index, checkbox.checked));
 
             const handle = document.createElement('span');
             handle.className = 'drag-handle';
@@ -2762,7 +2759,8 @@
 
     async function ouvrirPageAutresFichiers() {
         if (!verifierConfig()) return;
-        if (depotsSelectionnes.size === 0) return;
+        const reposAtraiter = cibles.filter(c => c.coche);
+        if (reposAtraiter.length === 0) return;
 
         document.getElementById('page-principale').style.display = 'none';
         const pagePlein = document.getElementById('page-autres-fichiers');
@@ -2771,8 +2769,6 @@
 
         const zone = document.getElementById('autres-fichiers-contenu');
         zone.innerHTML = "<p style='color:#86868b; font-size:14px;'>Chargement des fichiers…</p>";
-
-        const reposAtraiter = cibles.filter(c => depotsSelectionnes.has(c.repo));
         zone.innerHTML = "";
 
         for (const cible of reposAtraiter) {
