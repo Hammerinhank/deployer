@@ -60,8 +60,12 @@
       "name": "anniversaires",
       "repo": "anniversaires",
       "coche": true
+    },
+    {
+      "name": "Généalogie",
+      "repo": "genealogie"
     }
   ],
   "derniereCible": "anniversaires",
-  "maj": "2026-08-19T15:52:35.293Z"
+  "maj": "2026-08-20T10:57:34.048Z"
 }
