@@ -63,9 +63,10 @@
     },
     {
       "name": "Généalogie",
-      "repo": "genealogie"
+      "repo": "genealogie",
+      "coche": true
     }
   ],
   "derniereCible": "genealogie",
-  "maj": "2026-08-20T10:57:54.974Z"
+  "maj": "2026-08-20T22:36:35.050Z"
 }
