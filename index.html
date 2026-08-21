@@ -78,6 +78,11 @@
             border: 2px dashed #5856d6;
             background: #f0f0ff;
         }
+        /* Grande zone d'édition plein écran (section 7) */
+        #edition-textarea {
+            height: 60vh;
+            min-height: 320px;
+        }
         .btn {
             background-color: #0071e3;
             color: white;
@@ -343,7 +348,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.11</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.12</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -495,10 +500,29 @@
             fichiers du dépôt autres que le fichier HTML. Colle le nouveau contenu ou
             glisse-dépose un fichier sur une zone, ajoute un commentaire de version (obligatoire,
             3 mots minimum), puis clique sur « Mettre à jour sur GitHub » pour ce fichier précis.
-            Double-clic (ou double-tap) sur une zone pour la vider.
+            Double-clic (ou double-tap) sur une zone pour la vider. Pour les fichiers texte, le
+            bouton « Edit » ouvre une édition en plein écran, plus confortable sur iPhone.
         </p>
         <button class="btn" id="btn-dupliquer-commentaire" onclick="dupliquerCommentaireHtml()" style="background-color: #ff9500;" data-tip="Va chercher le commentaire du dernier commit fait sur le fichier index.html de ce dépôt, et remplit avec ce texte tous les champs « Commentaire de version » de cette page. Pratique quand tu déploies plusieurs fichiers en même temps que le HTML avec le même commentaire — chaque champ reste ensuite modifiable individuellement si besoin.">📋 Dupliquer commentaire de l'HTML</button>
         <div id="autres-fichiers-contenu" style="margin-top: 15px;"></div>
+    </div>
+</div>
+
+<!-- 7. PAGE : ÉDITION PLEIN ÉCRAN D'UN FICHIER TEXTE (masquée par défaut) -->
+<div class="container" id="page-edition-texte" style="display:none;">
+    <div class="card">
+        <button class="btn" id="btn-retour-edition" style="background-color: #6e6e73;">⬅ Retour</button>
+        <h2 style="margin-top: 15px;" id="edition-titre">✏️ Édition</h2>
+        <p style="font-size: 13px; color: #86868b; margin-top: 0;">
+            Modifie ce texte à l'aise en plein écran. Rien n'est envoyé sur GitHub depuis cette
+            page : au retour, tu choisiras si ce texte remplace le contenu de la zone de la page
+            précédente. Tant qu'aucun commit n'est fait, ce texte n'est pas conservé si tu fermes
+            l'appli.
+        </p>
+        <textarea id="edition-textarea" placeholder="Texte à éditer…"></textarea>
+        <button class="btn" id="btn-edition-coller" style="background-color: #5856d6;" data-tip="Lit le presse-papier de l'appareil et remplace (après confirmation si la zone n'est pas vide) le contenu de la zone d'édition par son texte.">📋 Coller depuis le presse-papier</button>
+        <button class="btn" id="btn-edition-vider" style="background-color: #6e6e73; margin-top: 10px;" data-tip="Vide (après confirmation) le contenu de la zone d'édition. Ne touche à rien sur GitHub ni sur la page précédente. Le double-clic (ou double-tap) sur la zone fait la même chose.">Vider l'écran</button>
+        <div id="edition-status" class="status" style="margin-top: 15px;"></div>
     </div>
 </div>
 
@@ -2867,6 +2891,116 @@
         }
     }
 
+    // ————— Section 7 : édition plein écran d'un fichier texte —————
+
+    let editionTextareaSource = null;
+    let editionCheminCourant = '';
+
+    function afficherStatutEdition(texte, type) {
+        const box = document.getElementById('edition-status');
+        if (!box) return;
+        box.style.display = 'block';
+        box.className = 'status ' + type;
+        box.textContent = texte;
+    }
+
+    function ouvrirEditionPleinePage(textareaSource, chemin) {
+        editionTextareaSource = textareaSource;
+        editionCheminCourant = chemin;
+
+        document.getElementById('edition-titre').textContent = `✏️ Édition : ${chemin}`;
+        document.getElementById('edition-textarea').value = textareaSource.value;
+        const statut = document.getElementById('edition-status');
+        statut.style.display = 'none';
+        statut.textContent = '';
+
+        document.getElementById('page-autres-fichiers').style.display = 'none';
+        document.getElementById('page-edition-texte').style.display = 'block';
+        window.scrollTo(0, 0);
+    }
+
+    async function fermerEditionPleinePage() {
+        const texteEdite = document.getElementById('edition-textarea').value;
+        const ok = await confirmerModal(
+            `Remplacer le contenu actuel de la zone de « ${editionCheminCourant} » par le texte ` +
+            "que tu viens d'éditer ?\n\nSi tu choisis « Ne pas remplacer », le texte édité ici sera abandonné.",
+            "Remplacer",
+            "Ne pas remplacer"
+        );
+        if (ok && editionTextareaSource) {
+            editionTextareaSource.value = texteEdite;
+        }
+
+        document.getElementById('page-edition-texte').style.display = 'none';
+        document.getElementById('page-autres-fichiers').style.display = 'block';
+        window.scrollTo(0, 0);
+
+        editionTextareaSource = null;
+        editionCheminCourant = '';
+    }
+
+    async function collerDepuisPressePapierEdition() {
+        const zone = document.getElementById('edition-textarea');
+        let texte;
+        try {
+            texte = await navigator.clipboard.readText();
+        } catch (_) {
+            afficherStatutEdition(
+                "Impossible de lire automatiquement le presse-papier sur cet appareil " +
+                "(autorisation refusée ou navigateur non compatible). Fais un appui long " +
+                "dans la zone de texte ci-dessus puis choisis « Coller ».",
+                "error"
+            );
+            return;
+        }
+
+        if (!texte) {
+            afficherStatutEdition("Le presse-papier est vide ou ne contient pas de texte.", "error");
+            return;
+        }
+
+        if (zone.value.trim()) {
+            const ok = await confirmerModal(
+                "Remplacer le contenu actuel de la zone d'édition par le texte du presse-papier ?",
+                "Remplacer",
+                "Annuler"
+            );
+            if (!ok) return;
+        }
+
+        zone.value = texte;
+        afficherStatutEdition("Texte du presse-papier inséré.", "success");
+    }
+
+    document.getElementById('btn-retour-edition').addEventListener('click', fermerEditionPleinePage);
+    document.getElementById('btn-edition-vider').addEventListener('click', () => {
+        viderZoneAvecConfirmationGenerique(document.getElementById('edition-textarea'));
+    });
+    document.getElementById('btn-edition-coller').addEventListener('click', collerDepuisPressePapierEdition);
+    activerDoubleClicViderGenerique(document.getElementById('edition-textarea'));
+
+    // Extensions considérées comme non textuelles : pas de bouton "Edit" pour celles-ci
+    // (fichiers sans extension, comme LICENSE ou Dockerfile, sont considérés texte).
+    const EXTENSIONS_BINAIRES = [
+        '.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.ico', '.tiff', '.tif',
+        '.pdf', '.zip', '.gz', '.tgz', '.tar', '.rar', '.7z',
+        '.exe', '.dll', '.so', '.dylib', '.bin', '.dat', '.class', '.jar', '.apk', '.ipa',
+        '.mp3', '.mp4', '.mov', '.avi', '.mkv', '.wav', '.ogg', '.flac', '.webm',
+        '.ttf', '.otf', '.woff', '.woff2', '.eot',
+        '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+        '.psd', '.ai', '.sketch', '.db', '.sqlite', '.sqlite3'
+    ];
+
+    function estFichierTexte(chemin) {
+        const nom = chemin.toLowerCase();
+        const dernierSlash = nom.lastIndexOf('/');
+        const nomFichier = dernierSlash === -1 ? nom : nom.slice(dernierSlash + 1);
+        const dernierPoint = nomFichier.lastIndexOf('.');
+        if (dernierPoint <= 0) return true; // pas d'extension (ou fichier commençant par un point)
+        const ext = nomFichier.slice(dernierPoint);
+        return !EXTENSIONS_BINAIRES.includes(ext);
+    }
+
     function construireCarteFichier(repo, chemin, branche) {
         const card = document.createElement('div');
         card.className = 'card';
@@ -2907,6 +3041,17 @@
         card.appendChild(sousLabel);
         card.appendChild(textarea);
         card.appendChild(btnVider);
+
+        if (estFichierTexte(chemin)) {
+            const btnEdit = document.createElement('button');
+            btnEdit.className = 'btn';
+            btnEdit.style.cssText = 'background-color:#0071e3; margin-top:5px;';
+            btnEdit.textContent = '✏️ Edit';
+            btnEdit.addEventListener('click', () => ouvrirEditionPleinePage(textarea, chemin));
+            attacherTooltip(btnEdit, "Ouvre le contenu de cette zone en plein écran pour l'éditer plus confortablement (pratique sur iPhone). Tu pourras le vider ou coller le contenu du presse-papier, puis choisir en revenant si ce texte remplace le contenu de cette zone. Rien n'est envoyé sur GitHub tant que tu ne cliques pas sur « Mettre à jour sur GitHub » ci-dessous.");
+            card.appendChild(btnEdit);
+        }
+
         card.appendChild(inputCommentaire);
         card.appendChild(btnDeployer);
 
