@@ -343,7 +343,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.10</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.11</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -384,8 +384,9 @@
             <summary><h2>2. Gestion des Applications Cibles</h2></summary>
             <div class="section-contenu">
                 <p style="font-size: 12px; color: #86868b; margin-top: 0;">
-                    Coche une ou plusieurs applications ci-dessous pour activer, à l'étape 3, la mise
-                    à jour groupée de leurs fichiers autres que le HTML.
+                    Coche une application ci-dessous pour activer, à l'étape 3, le bouton de mise
+                    à jour de ses fichiers autres que le HTML — le bouton n'apparaît que lorsque
+                    cette application est aussi celle sélectionnée dans le menu déroulant de l'étape 3.
                 </p>
                 <div id="target-list"></div>
                 <hr style="border: 0; border-top: 1px solid #e5e5ea; margin: 15px 0;">
@@ -432,7 +433,7 @@
         <input type="text" id="commit-comment" placeholder="Ex : Ajout du bouton de partage" autocomplete="off">
 
         <button class="btn" onclick="deployerCode()" style="background-color: #5856d6;" data-tip="Envoie le contenu de la zone de code ci-dessus comme nouvelle version (un nouveau commit) du fichier index.html de l'application cible sélectionnée. Le commentaire de version est obligatoire et apparaîtra dans l'historique (section 4). Une vérification automatique confirme ensuite que le fichier réellement en ligne correspond bien à ce qui vient d'être envoyé.">Mettre à jour sur GitHub</button>
-        <button class="btn" id="btn-autres-fichiers" onclick="ouvrirPageAutresFichiers()" style="display:none; background-color: #5856d6; margin-top: 10px;" data-tip="Ouvre un écran séparé listant, pour chaque application cochée à l'étape 2, tous les fichiers du dépôt autres que le fichier HTML. Permet de mettre à jour ces fichiers un par un sur GitHub, avec la même logique que ci-dessus (copier-coller ou glisser-déposer, double-clic pour vider).">📁 Gérer les autres fichiers (dépôts cochés)</button>
+        <button class="btn" id="btn-autres-fichiers" onclick="ouvrirPageAutresFichiers()" style="display:none; background-color: #5856d6; margin-top: 10px;" data-tip="Ouvre un écran séparé listant tous les fichiers du dépôt (autres que le fichier HTML) de l'application actuellement sélectionnée juste au-dessus, si elle est cochée à l'étape 2. Permet de mettre à jour ces fichiers un par un sur GitHub, avec la même logique que ci-dessus (copier-coller ou glisser-déposer, double-clic pour vider).">📁 Gérer les autres fichiers</button>
     </div>
 
     <!-- 4. HISTORIQUE & RESTAURATION -->
@@ -490,12 +491,13 @@
         <button class="btn" onclick="fermerPageAutresFichiers()" style="background-color: #6e6e73;">⬅ Retour au Déployeur</button>
         <h2 style="margin-top: 15px;">📁 Mise à jour des autres fichiers</h2>
         <p style="font-size: 13px; color: #86868b; margin-top: 0;">
-            Pour chaque application cochée à l'étape 2 : liste des fichiers du dépôt autres que le
-            fichier HTML. Colle le nouveau contenu ou glisse-dépose un fichier sur une zone, ajoute
-            un commentaire de version (obligatoire, 3 mots minimum), puis clique sur « Mettre à jour
-            sur GitHub » pour ce fichier précis. Double-clic (ou double-tap) sur une zone pour la vider.
+            Pour l'application sélectionnée à l'étape 3 (et cochée à l'étape 2) : liste des
+            fichiers du dépôt autres que le fichier HTML. Colle le nouveau contenu ou
+            glisse-dépose un fichier sur une zone, ajoute un commentaire de version (obligatoire,
+            3 mots minimum), puis clique sur « Mettre à jour sur GitHub » pour ce fichier précis.
+            Double-clic (ou double-tap) sur une zone pour la vider.
         </p>
-        <button class="btn" id="btn-dupliquer-commentaire" onclick="dupliquerCommentaireHtml()" style="background-color: #ff9500;" data-tip="Va chercher, pour chaque dépôt affiché ci-dessous, le commentaire du dernier commit fait sur son fichier index.html, et remplit avec ce texte tous les champs « Commentaire de version » de ce dépôt sur cette page. Pratique quand tu déploies plusieurs fichiers en même temps que le HTML avec le même commentaire — chaque champ reste ensuite modifiable individuellement si besoin.">📋 Dupliquer commentaire de l'HTML</button>
+        <button class="btn" id="btn-dupliquer-commentaire" onclick="dupliquerCommentaireHtml()" style="background-color: #ff9500;" data-tip="Va chercher le commentaire du dernier commit fait sur le fichier index.html de ce dépôt, et remplit avec ce texte tous les champs « Commentaire de version » de cette page. Pratique quand tu déploies plusieurs fichiers en même temps que le HTML avec le même commentaire — chaque champ reste ensuite modifiable individuellement si besoin.">📋 Dupliquer commentaire de l'HTML</button>
         <div id="autres-fichiers-contenu" style="margin-top: 15px;"></div>
     </div>
 </div>
@@ -1123,10 +1125,8 @@
         const btn = document.getElementById('btn-autres-fichiers');
         if (!btn) return;
         const selectDeploiement = document.getElementById('select-target');
-        const selectHistorique = document.getElementById('select-history-target');
         const repoDeploiement = selectDeploiement ? selectDeploiement.value : '';
-        const repoHistorique = selectHistorique ? selectHistorique.value : '';
-        const visible = cibles.some(c => c.coche && (c.repo === repoDeploiement || c.repo === repoHistorique));
+        const visible = cibles.some(c => c.coche && c.repo === repoDeploiement);
         btn.style.display = visible ? 'block' : 'none';
     }
 
@@ -1150,7 +1150,7 @@
             checkbox.type = 'checkbox';
             checkbox.className = 'target-checkbox';
             checkbox.checked = !!cible.coche;
-            attacherTooltip(checkbox, "Coche cette application pour l'inclure dans la mise à jour groupée des fichiers autres que le HTML. Le bouton « Gérer les autres fichiers » apparaît à l'étape 3 dès que cette application est sélectionnée dans le menu déroulant de l'étape 3 (Déploiement) ou de l'étape 4 (Historique). Cette case est mémorisée comme le reste de la liste des cibles (local + synchro GitHub, section 5).");
+            attacherTooltip(checkbox, "Coche cette application pour activer, à l'étape 3, le bouton « Gérer les autres fichiers » lorsque cette application est aussi celle sélectionnée dans le menu déroulant de l'étape 3 (Déploiement). Cette case est mémorisée comme le reste de la liste des cibles (local + synchro GitHub, section 5).");
             checkbox.addEventListener('change', () => toggleSelectionDepot(index, checkbox.checked));
 
             const handle = document.createElement('span');
@@ -1781,7 +1781,7 @@
                 "sert qu'à modifier un dépôt existant). Vérifie aussi que l'accès n'est pas limité à une " +
                 "liste de dépôts existants : choisis « All repositories », sinon le token ne pourra " +
                 "jamais en créer un nouveau.\n" +
-                "Dans les deux cas, pas besoin de régénérer le token ni de changer sa valeur ici : ouvre " +
+                "Dans les deux cas, pas besoin de régénérer le token ni de le recoller ici : ouvre " +
                 "la page du token concerné avec l'un des boutons ci-dessous, corrige la permission ou la " +
                 "case à cocher manquante, clique « Update » (fine-grained) ou « Update token » " +
                 "(classique) — la modification prend effet immédiatement — puis reviens ici et réessaie.";
@@ -2759,8 +2759,9 @@
 
     async function ouvrirPageAutresFichiers() {
         if (!verifierConfig()) return;
-        const reposAtraiter = cibles.filter(c => c.coche);
-        if (reposAtraiter.length === 0) return;
+        const repoSelectionne = document.getElementById('select-target').value;
+        const cible = cibles.find(c => c.coche && c.repo === repoSelectionne);
+        if (!cible) return;
 
         document.getElementById('page-principale').style.display = 'none';
         const pagePlein = document.getElementById('page-autres-fichiers');
@@ -2771,52 +2772,50 @@
         zone.innerHTML = "<p style='color:#86868b; font-size:14px;'>Chargement des fichiers…</p>";
         zone.innerHTML = "";
 
-        for (const cible of reposAtraiter) {
-            const blocRepo = document.createElement('div');
-            blocRepo.style.marginBottom = '25px';
-            blocRepo.dataset.repo = cible.repo;
+        const blocRepo = document.createElement('div');
+        blocRepo.style.marginBottom = '25px';
+        blocRepo.dataset.repo = cible.repo;
 
-            const titre = document.createElement('h2');
-            titre.style.cssText = 'font-size:15px; border-bottom:1px solid #e5e5ea; padding-bottom:8px;';
-            titre.textContent = `${cible.name} (${cible.repo})`;
-            blocRepo.appendChild(titre);
+        const titre = document.createElement('h2');
+        titre.style.cssText = 'font-size:15px; border-bottom:1px solid #e5e5ea; padding-bottom:8px;';
+        titre.textContent = `${cible.name} (${cible.repo})`;
+        blocRepo.appendChild(titre);
 
-            let branche = 'main';
-            try {
-                const rr = await fetch(`https://api.github.com/repos/${config.user}/${cible.repo}`, { headers: headersGitHub(), cache: "no-store" });
-                if (rr.ok) { const dd = await rr.json(); branche = dd.default_branch || 'main'; }
-            } catch (_) {}
+        let branche = 'main';
+        try {
+            const rr = await fetch(`https://api.github.com/repos/${config.user}/${cible.repo}`, { headers: headersGitHub(), cache: "no-store" });
+            if (rr.ok) { const dd = await rr.json(); branche = dd.default_branch || 'main'; }
+        } catch (_) {}
 
-            try {
-                const resultatArbre = await listerFichiersHorsHtml(cible.repo, branche);
-                const fichiers = resultatArbre.fichiers;
+        try {
+            const resultatArbre = await listerFichiersHorsHtml(cible.repo, branche);
+            const fichiers = resultatArbre.fichiers;
 
-                if (resultatArbre.tronque) {
-                    const avert = document.createElement('p');
-                    avert.style.cssText = 'color:#c62828; font-size:12px;';
-                    avert.textContent = "⚠️ La liste des fichiers de ce dépôt est peut-être incomplète (arbre trop volumineux).";
-                    blocRepo.appendChild(avert);
-                }
-
-                if (fichiers.length === 0) {
-                    const vide = document.createElement('p');
-                    vide.style.cssText = 'color:#86868b; font-size:13px;';
-                    vide.textContent = "Aucun fichier autre que le HTML dans ce dépôt.";
-                    blocRepo.appendChild(vide);
-                } else {
-                    fichiers.forEach(chemin => {
-                        blocRepo.appendChild(construireCarteFichier(cible.repo, chemin, branche));
-                    });
-                }
-            } catch (e) {
-                const err = document.createElement('p');
-                err.style.cssText = 'color:#c62828; font-size:13px; font-weight:600;';
-                err.textContent = `Erreur lors du listage des fichiers : ${e.message}`;
-                blocRepo.appendChild(err);
+            if (resultatArbre.tronque) {
+                const avert = document.createElement('p');
+                avert.style.cssText = 'color:#c62828; font-size:12px;';
+                avert.textContent = "⚠️ La liste des fichiers de ce dépôt est peut-être incomplète (arbre trop volumineux).";
+                blocRepo.appendChild(avert);
             }
 
-            zone.appendChild(blocRepo);
+            if (fichiers.length === 0) {
+                const vide = document.createElement('p');
+                vide.style.cssText = 'color:#86868b; font-size:13px;';
+                vide.textContent = "Aucun fichier autre que le HTML dans ce dépôt.";
+                blocRepo.appendChild(vide);
+            } else {
+                fichiers.forEach(chemin => {
+                    blocRepo.appendChild(construireCarteFichier(cible.repo, chemin, branche));
+                });
+            }
+        } catch (e) {
+            const err = document.createElement('p');
+            err.style.cssText = 'color:#c62828; font-size:13px; font-weight:600;';
+            err.textContent = `Erreur lors du listage des fichiers : ${e.message}`;
+            blocRepo.appendChild(err);
         }
+
+        zone.appendChild(blocRepo);
     }
 
     async function dupliquerCommentaireHtml() {
