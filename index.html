@@ -348,7 +348,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.12</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.13</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -501,7 +501,8 @@
             glisse-dépose un fichier sur une zone, ajoute un commentaire de version (obligatoire,
             3 mots minimum), puis clique sur « Mettre à jour sur GitHub » pour ce fichier précis.
             Double-clic (ou double-tap) sur une zone pour la vider. Pour les fichiers texte, le
-            bouton « Edit » ouvre une édition en plein écran, plus confortable sur iPhone.
+            bouton « Edit » ouvre en plein écran la dernière version du fichier sur GitHub, plus
+            confortable à éditer sur iPhone.
         </p>
         <button class="btn" id="btn-dupliquer-commentaire" onclick="dupliquerCommentaireHtml()" style="background-color: #ff9500;" data-tip="Va chercher le commentaire du dernier commit fait sur le fichier index.html de ce dépôt, et remplit avec ce texte tous les champs « Commentaire de version » de cette page. Pratique quand tu déploies plusieurs fichiers en même temps que le HTML avec le même commentaire — chaque champ reste ensuite modifiable individuellement si besoin.">📋 Dupliquer commentaire de l'HTML</button>
         <div id="autres-fichiers-contenu" style="margin-top: 15px;"></div>
@@ -514,10 +515,11 @@
         <button class="btn" id="btn-retour-edition" style="background-color: #6e6e73;">⬅ Retour</button>
         <h2 style="margin-top: 15px;" id="edition-titre">✏️ Édition</h2>
         <p style="font-size: 13px; color: #86868b; margin-top: 0;">
-            Modifie ce texte à l'aise en plein écran. Rien n'est envoyé sur GitHub depuis cette
-            page : au retour, tu choisiras si ce texte remplace le contenu de la zone de la page
-            précédente. Tant qu'aucun commit n'est fait, ce texte n'est pas conservé si tu fermes
-            l'appli.
+            À l'ouverture, cette zone se charge avec la dernière version du fichier telle qu'elle
+            est actuellement sur GitHub. Modifie-la à l'aise en plein écran. Rien n'est envoyé sur
+            GitHub depuis cette page : au retour, tu choisiras si ce texte remplace le contenu de
+            la zone de la page précédente. Tant qu'aucun commit n'est fait, ce texte n'est pas
+            conservé si tu fermes l'appli.
         </p>
         <textarea id="edition-textarea" placeholder="Texte à éditer…"></textarea>
         <button class="btn" id="btn-edition-coller" style="background-color: #5856d6;" data-tip="Lit le presse-papier de l'appareil et remplace (après confirmation si la zone n'est pas vide) le contenu de la zone d'édition par son texte.">📋 Coller depuis le presse-papier</button>
@@ -2904,12 +2906,19 @@
         box.textContent = texte;
     }
 
-    function ouvrirEditionPleinePage(textareaSource, chemin) {
+    function ouvrirEditionPleinePage(textareaSource, chemin, repo, branche) {
         editionTextareaSource = textareaSource;
         editionCheminCourant = chemin;
 
         document.getElementById('edition-titre').textContent = `✏️ Édition : ${chemin}`;
-        document.getElementById('edition-textarea').value = textareaSource.value;
+        const zone = document.getElementById('edition-textarea');
+        const btnVider = document.getElementById('btn-edition-vider');
+        const btnColler = document.getElementById('btn-edition-coller');
+        zone.value = '';
+        zone.disabled = true;
+        zone.placeholder = 'Chargement de la dernière version depuis GitHub…';
+        btnVider.disabled = true;
+        btnColler.disabled = true;
         const statut = document.getElementById('edition-status');
         statut.style.display = 'none';
         statut.textContent = '';
@@ -2917,6 +2926,26 @@
         document.getElementById('page-autres-fichiers').style.display = 'none';
         document.getElementById('page-edition-texte').style.display = 'block';
         window.scrollTo(0, 0);
+
+        recupererContenuFichierRef(repo, chemin, branche)
+            .then(contenu => {
+                zone.value = contenu;
+            })
+            .catch(e => {
+                zone.value = textareaSource.value;
+                afficherStatutEdition(
+                    `Impossible de récupérer la dernière version de « ${chemin} » depuis GitHub : ` +
+                    `${e.message}.\n\nLe texte affiché ci-dessous est celui déjà présent dans la zone ` +
+                    "de la page précédente (peut être vide).",
+                    "error"
+                );
+            })
+            .finally(() => {
+                zone.disabled = false;
+                zone.placeholder = 'Texte à éditer…';
+                btnVider.disabled = false;
+                btnColler.disabled = false;
+            });
     }
 
     async function fermerEditionPleinePage() {
@@ -3047,8 +3076,8 @@
             btnEdit.className = 'btn';
             btnEdit.style.cssText = 'background-color:#0071e3; margin-top:5px;';
             btnEdit.textContent = '✏️ Edit';
-            btnEdit.addEventListener('click', () => ouvrirEditionPleinePage(textarea, chemin));
-            attacherTooltip(btnEdit, "Ouvre le contenu de cette zone en plein écran pour l'éditer plus confortablement (pratique sur iPhone). Tu pourras le vider ou coller le contenu du presse-papier, puis choisir en revenant si ce texte remplace le contenu de cette zone. Rien n'est envoyé sur GitHub tant que tu ne cliques pas sur « Mettre à jour sur GitHub » ci-dessous.");
+            btnEdit.addEventListener('click', () => ouvrirEditionPleinePage(textarea, chemin, repo, branche));
+            attacherTooltip(btnEdit, "Ouvre en plein écran la dernière version de ce fichier telle qu'elle est sur GitHub, pour l'éditer plus confortablement (pratique sur iPhone). Tu pourras la vider ou coller le contenu du presse-papier, puis choisir en revenant si ce texte remplace le contenu de la zone ci-dessous. Rien n'est envoyé sur GitHub tant que tu ne cliques pas sur « Mettre à jour sur GitHub ».");
             card.appendChild(btnEdit);
         }
 
