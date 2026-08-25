@@ -348,7 +348,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.13</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.14</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -3030,6 +3030,207 @@
         return !EXTENSIONS_BINAIRES.includes(ext);
     }
 
+    function afficherStatutCarte(statutDiv, texte, type) {
+        if (!statutDiv) return;
+        statutDiv.style.display = 'block';
+        statutDiv.className = 'status ' + type;
+        statutDiv.textContent = texte;
+    }
+
+    async function voirVersionFichier(repo, chemin, commitSha, dateStr, statutDiv) {
+        try {
+            const contenu = await recupererContenuFichierRef(repo, chemin, commitSha);
+            const blob = new Blob([contenu], { type: 'text/plain;charset=utf-8' });
+            const blobUrl = URL.createObjectURL(blob);
+            window.open(blobUrl, '_blank');
+        } catch (error) {
+            afficherStatutCarte(statutDiv, `Impossible d'afficher cette version : ${error.message}`, "error");
+        }
+    }
+
+    async function copierVersionFichier(repo, chemin, commitSha, dateStr, bouton, statutDiv) {
+        const origine = bouton ? bouton.textContent : null;
+        try {
+            if (bouton) bouton.textContent = "Copie…";
+            const contenu = await recupererContenuFichierRef(repo, chemin, commitSha);
+
+            const ok = await copierTexte(contenu);
+            if (!ok) {
+                if (bouton) bouton.textContent = origine;
+                afficherStatutCarte(
+                    statutDiv,
+                    `La copie automatique a échoué. Ouvre plutôt la version avec « Voir » puis ` +
+                    `copie le texte à la main (version du ${dateStr}).`,
+                    "error"
+                );
+                return;
+            }
+
+            if (bouton) {
+                bouton.textContent = "Copié ✓";
+                setTimeout(() => { bouton.textContent = origine; }, 2000);
+            }
+        } catch (error) {
+            if (bouton) bouton.textContent = origine;
+            afficherStatutCarte(statutDiv, `Impossible de copier cette version : ${error.message}`, "error");
+        }
+    }
+
+    async function telechargerVersionFichier(repo, chemin, commitSha, dateStr, bouton, statutDiv) {
+        const origine = bouton ? bouton.textContent : null;
+        try {
+            if (bouton) bouton.textContent = "Préparation…";
+            const contenu = await recupererContenuFichierRef(repo, chemin, commitSha);
+
+            const blob = new Blob([contenu], { type: 'text/plain;charset=utf-8' });
+            const blobUrl = URL.createObjectURL(blob);
+            const lien = document.createElement('a');
+            lien.href = blobUrl;
+            const nomFichier = chemin.includes('/') ? chemin.slice(chemin.lastIndexOf('/') + 1) : chemin;
+            lien.download = nomFichier;
+            document.body.appendChild(lien);
+            lien.click();
+            document.body.removeChild(lien);
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+
+            if (bouton) {
+                bouton.textContent = "Téléchargé ✓";
+                setTimeout(() => { bouton.textContent = origine; }, 2000);
+            }
+        } catch (error) {
+            if (bouton) bouton.textContent = origine;
+            afficherStatutCarte(statutDiv, `Impossible de télécharger cette version : ${error.message}`, "error");
+        }
+    }
+
+    async function restaurerVersionFichier(repo, chemin, branche, commitSha, dateStr, listDiv, statutDiv, btnHistorique) {
+        const okRestaurer = await confirmerModal(
+            `Restaurer la version du ${dateStr} de « ${chemin} » ?\n\nLa version actuelle restera dans l'historique, tu pourras y revenir.`,
+            "Restaurer",
+            "Annuler"
+        );
+        if (!okRestaurer) return;
+
+        try {
+            afficherStatutCarte(statutDiv, "Restauration en cours...", "success");
+
+            const ancienContenu = await recupererContenuFichierRef(repo, chemin, commitSha);
+
+            const urlActuel = `https://api.github.com/repos/${config.user}/${repo}/contents/${encoderCheminAPI(chemin)}`;
+            const reponseActuel = await fetch(urlActuel + `?ref=${encodeURIComponent(branche)}`, { headers: headersGitHub(), cache: "no-store" });
+            if (!reponseActuel.ok) throw new Error("Impossible de lire le fichier actuel.");
+            const fichierActuel = await reponseActuel.json();
+
+            const reponsePut = await fetch(urlActuel, {
+                method: "PUT",
+                headers: headersGitHub(),
+                body: JSON.stringify({
+                    message: `Restauration de la version du ${dateStr} de ${chemin} via Le Déployeur`,
+                    content: encoderBase64(ancienContenu),
+                    sha: fichierActuel.sha,
+                    branch: branche
+                })
+            });
+
+            if (!reponsePut.ok) {
+                const errData = await reponsePut.json().catch(() => ({}));
+                afficherStatutCarte(statutDiv, `Échec de la restauration : ${errData.message || reponsePut.statusText}`, "error");
+                return;
+            }
+
+            const resultat = await reponsePut.json();
+            const shaCommitComplet = (resultat.commit && resultat.commit.sha) ? resultat.commit.sha : null;
+            const shaCommit = shaCommitComplet ? shaCommitComplet.substring(0, 7) : "inconnu";
+
+            afficherStatutCarte(statutDiv, `Commit ${shaCommit} créé. Vérification de la version restaurée en ligne...`, "success");
+            const verif = await verifierContenuEnLigne(urlActuel, ancienContenu, shaCommitComplet, (n, total) => {
+                afficherStatutCarte(
+                    statutDiv,
+                    `Commit ${shaCommit} créé. GitHub n'a pas encore propagé le fichier — ` +
+                    `nouvelle vérification… (tentative ${n}/${total})`,
+                    "success"
+                );
+            });
+
+            if (verif.ok) {
+                afficherStatutCarte(statutDiv, `✅ Version du ${dateStr} restaurée et VÉRIFIÉE (commit ${shaCommit}).`, "success");
+                chargerHistoriqueFichier(repo, chemin, branche, listDiv, statutDiv, btnHistorique);
+            } else {
+                afficherStatutCarte(
+                    statutDiv,
+                    `⚠️ Le commit de restauration ${shaCommit} a été créé, mais la vérification a échoué :\n\n${verif.detail}`,
+                    "error"
+                );
+            }
+        } catch (error) {
+            afficherStatutCarte(statutDiv, `Erreur pendant la restauration : ${error.message}`, "error");
+        }
+    }
+
+    async function chargerHistoriqueFichier(repo, chemin, branche, listDiv, statutDiv, btn) {
+        if (!verifierConfig()) return;
+
+        btn.disabled = true;
+        statutDiv.style.display = 'none';
+        listDiv.innerHTML = "<p style='color:#86868b; font-size:14px;'>Chargement de l'historique...</p>";
+
+        try {
+            const commits = await recupererCommitsFichier(repo, chemin, 10);
+
+            if (commits.length === 0) {
+                listDiv.innerHTML = `<p style='color:#86868b; font-size:14px;'>Aucune version trouvée pour « ${echapperHtml(chemin)} ».</p>`;
+                btn.disabled = false;
+                return;
+            }
+
+            listDiv.innerHTML = "";
+            commits.forEach((commit, index) => {
+                const date = new Date(commit.commit.author.date);
+                const dateStr = date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+                    + " à " + date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+                const msg = commit.commit.message;
+                const estActuelle = index === 0;
+
+                const item = document.createElement('div');
+                item.className = 'commit-item' + (estActuelle ? ' current' : '');
+                item.innerHTML = `
+                    <div class="commit-date">${dateStr}${estActuelle ? '<span class="commit-badge">Version actuelle</span>' : ''}</div>
+                    <div class="commit-msg">${echapperHtml(msg)}</div>
+                    <div class="commit-actions">
+                        <button class="btn-small btn-view">Voir</button>
+                        <button class="btn-small btn-copy">Copier</button>
+                        <button class="btn-small btn-download">Télécharger</button>
+                        ${estActuelle ? '' : '<button class="btn-small btn-restore">Restaurer</button>'}
+                    </div>`;
+
+                const btnVoir = item.querySelector('.btn-view');
+                attacherTooltip(btnVoir, `Affiche le contenu complet de cette version du ${dateStr} dans une fenêtre séparée, sans rien modifier ni republier — pratique pour relire ou comparer avant de restaurer.`);
+                btnVoir.addEventListener('click', () => voirVersionFichier(repo, chemin, commit.sha, dateStr, statutDiv));
+
+                const btnCopier = item.querySelector('.btn-copy');
+                attacherTooltip(btnCopier, `Copie dans le presse-papier le contenu complet de cette version du ${dateStr}, par exemple pour le recoller dans la zone ci-dessus et le modifier avant de le redéployer.`);
+                btnCopier.addEventListener('click', (e) => copierVersionFichier(repo, chemin, commit.sha, dateStr, e.target, statutDiv));
+
+                const btnTelecharger = item.querySelector('.btn-download');
+                attacherTooltip(btnTelecharger, `Télécharge cette version du ${dateStr} sous forme de fichier sur cet appareil, sans rien changer sur GitHub.`);
+                btnTelecharger.addEventListener('click', (e) => telechargerVersionFichier(repo, chemin, commit.sha, dateStr, e.target, statutDiv));
+
+                const btnRestore = item.querySelector('.btn-restore');
+                if (btnRestore) {
+                    attacherTooltip(btnRestore, `Republie le contenu de cette version du ${dateStr} en créant un NOUVEAU commit sur « ${chemin} ». La version actuelle n'est pas effacée : elle reste dans l'historique et tu pourras toujours y revenir ensuite.`);
+                    btnRestore.addEventListener('click', () => restaurerVersionFichier(repo, chemin, branche, commit.sha, dateStr, listDiv, statutDiv, btn));
+                }
+
+                listDiv.appendChild(item);
+            });
+        } catch (error) {
+            listDiv.innerHTML = "";
+            afficherStatutCarte(statutDiv, `Impossible de charger l'historique : ${error.message}`, "error");
+        }
+
+        btn.disabled = false;
+    }
+
     function construireCarteFichier(repo, chemin, branche) {
         const card = document.createElement('div');
         card.className = 'card';
@@ -3080,6 +3281,25 @@
             attacherTooltip(btnEdit, "Ouvre en plein écran la dernière version de ce fichier telle qu'elle est sur GitHub, pour l'éditer plus confortablement (pratique sur iPhone). Tu pourras la vider ou coller le contenu du presse-papier, puis choisir en revenant si ce texte remplace le contenu de la zone ci-dessous. Rien n'est envoyé sur GitHub tant que tu ne cliques pas sur « Mettre à jour sur GitHub ».");
             card.appendChild(btnEdit);
         }
+
+        const btnHistorique = document.createElement('button');
+        btnHistorique.className = 'btn';
+        btnHistorique.style.cssText = 'background-color:#ff9500; margin-top:5px;';
+        btnHistorique.textContent = "Charger l'historique";
+        attacherTooltip(btnHistorique, `Récupère la liste des commits (versions successives) de « ${chemin} », avec leur date et leur commentaire de version, pour pouvoir ensuite consulter, copier, télécharger ou restaurer une ancienne version ci-dessous.`);
+
+        const historiqueStatut = document.createElement('div');
+        historiqueStatut.className = 'status';
+        historiqueStatut.style.marginTop = '10px';
+
+        const historiqueListe = document.createElement('div');
+        historiqueListe.style.marginTop = '10px';
+
+        btnHistorique.addEventListener('click', () => chargerHistoriqueFichier(repo, chemin, branche, historiqueListe, historiqueStatut, btnHistorique));
+
+        card.appendChild(btnHistorique);
+        card.appendChild(historiqueStatut);
+        card.appendChild(historiqueListe);
 
         card.appendChild(inputCommentaire);
         card.appendChild(btnDeployer);
