@@ -65,8 +65,12 @@
       "name": "Généalogie",
       "repo": "genealogie",
       "coche": true
+    },
+    {
+      "name": "Un niveau horizontal",
+      "repo": "niveau"
     }
   ],
   "derniereCible": "genealogie",
-  "maj": "2026-08-25T03:02:57.010Z"
+  "maj": "2026-08-25T12:08:58.965Z"
 }
