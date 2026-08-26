@@ -5,12 +5,12 @@
       "repo": "deployer"
     },
     {
-      "name": "Parkings",
-      "repo": "test-app"
-    },
-    {
       "name": "Tourisme",
       "repo": "Tourisme"
+    },
+    {
+      "name": "Parkings",
+      "repo": "test-app"
     },
     {
       "name": "Calcul de pente",
@@ -72,5 +72,5 @@
     }
   ],
   "derniereCible": "genealogie",
-  "maj": "2026-08-25T20:54:32.883Z"
+  "maj": "2026-08-26T21:39:59.256Z"
 }
