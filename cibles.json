@@ -69,8 +69,12 @@
     {
       "name": "Un niveau horizontal",
       "repo": "niveau"
+    },
+    {
+      "name": "La cave à vins",
+      "repo": "vins"
     }
   ],
   "derniereCible": "genealogie",
-  "maj": "2026-08-26T21:39:59.256Z"
+  "maj": "2026-08-26T21:40:57.745Z"
 }
