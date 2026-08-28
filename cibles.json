@@ -72,9 +72,10 @@
     },
     {
       "name": "La cave à vins",
-      "repo": "vins"
+      "repo": "vins",
+      "coche": true
     }
   ],
   "derniereCible": "vins",
-  "maj": "2026-08-28T06:40:17.437Z"
+  "maj": "2026-08-28T07:19:58.639Z"
 }
