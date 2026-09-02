@@ -348,7 +348,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.14</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.15</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -502,7 +502,9 @@
             3 mots minimum), puis clique sur « Mettre à jour sur GitHub » pour ce fichier précis.
             Double-clic (ou double-tap) sur une zone pour la vider. Pour les fichiers texte, le
             bouton « Edit » ouvre en plein écran la dernière version du fichier sur GitHub, plus
-            confortable à éditer sur iPhone.
+            confortable à éditer sur iPhone. Reste appuyé plus de 5 secondes sur « Charger
+            l'historique » pour charger tout l'historique en continu (le bouton devient rouge) ;
+            un simple appui dessus pendant qu'il est rouge arrête le chargement.
         </p>
         <button class="btn" id="btn-dupliquer-commentaire" onclick="dupliquerCommentaireHtml()" style="background-color: #ff9500;" data-tip="Va chercher le commentaire du dernier commit fait sur le fichier index.html de ce dépôt, et remplit avec ce texte tous les champs « Commentaire de version » de cette page. Pratique quand tu déploies plusieurs fichiers en même temps que le HTML avec le même commentaire — chaque champ reste ensuite modifiable individuellement si besoin.">📋 Dupliquer commentaire de l'HTML</button>
         <div id="autres-fichiers-contenu" style="margin-top: 15px;"></div>
@@ -951,8 +953,9 @@
         return { fichiers, tronque: !!data.truncated };
     }
 
-    async function recupererCommitsFichier(repo, chemin, limite) {
-        const url = `https://api.github.com/repos/${config.user}/${repo}/commits?path=${encodeURIComponent(chemin)}&per_page=${limite}`;
+    async function recupererCommitsFichier(repo, chemin, limite, page) {
+        const url = `https://api.github.com/repos/${config.user}/${repo}/commits?path=${encodeURIComponent(chemin)}&per_page=${limite}` +
+            (page ? `&page=${page}` : '');
         const rep = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
         if (!rep.ok) {
             let detail = `${rep.status} ${rep.statusText}`;
@@ -3167,6 +3170,45 @@
         }
     }
 
+    function construireElementCommitFichier(repo, chemin, branche, commit, estActuelle, listDiv, statutDiv, btn) {
+        const date = new Date(commit.commit.author.date);
+        const dateStr = date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+            + " à " + date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        const msg = commit.commit.message;
+
+        const item = document.createElement('div');
+        item.className = 'commit-item' + (estActuelle ? ' current' : '');
+        item.innerHTML = `
+            <div class="commit-date">${dateStr}${estActuelle ? '<span class="commit-badge">Version actuelle</span>' : ''}</div>
+            <div class="commit-msg">${echapperHtml(msg)}</div>
+            <div class="commit-actions">
+                <button class="btn-small btn-view">Voir</button>
+                <button class="btn-small btn-copy">Copier</button>
+                <button class="btn-small btn-download">Télécharger</button>
+                ${estActuelle ? '' : '<button class="btn-small btn-restore">Restaurer</button>'}
+            </div>`;
+
+        const btnVoir = item.querySelector('.btn-view');
+        attacherTooltip(btnVoir, `Affiche le contenu complet de cette version du ${dateStr} dans une fenêtre séparée, sans rien modifier ni republier — pratique pour relire ou comparer avant de restaurer.`);
+        btnVoir.addEventListener('click', () => voirVersionFichier(repo, chemin, commit.sha, dateStr, statutDiv));
+
+        const btnCopier = item.querySelector('.btn-copy');
+        attacherTooltip(btnCopier, `Copie dans le presse-papier le contenu complet de cette version du ${dateStr}, par exemple pour le recoller dans la zone ci-dessus et le modifier avant de le redéployer.`);
+        btnCopier.addEventListener('click', (e) => copierVersionFichier(repo, chemin, commit.sha, dateStr, e.target, statutDiv));
+
+        const btnTelecharger = item.querySelector('.btn-download');
+        attacherTooltip(btnTelecharger, `Télécharge cette version du ${dateStr} sous forme de fichier sur cet appareil, sans rien changer sur GitHub.`);
+        btnTelecharger.addEventListener('click', (e) => telechargerVersionFichier(repo, chemin, commit.sha, dateStr, e.target, statutDiv));
+
+        const btnRestore = item.querySelector('.btn-restore');
+        if (btnRestore) {
+            attacherTooltip(btnRestore, `Republie le contenu de cette version du ${dateStr} en créant un NOUVEAU commit sur « ${chemin} ». La version actuelle n'est pas effacée : elle reste dans l'historique et tu pourras toujours y revenir ensuite.`);
+            btnRestore.addEventListener('click', () => restaurerVersionFichier(repo, chemin, branche, commit.sha, dateStr, listDiv, statutDiv, btn));
+        }
+
+        return item;
+    }
+
     async function chargerHistoriqueFichier(repo, chemin, branche, listDiv, statutDiv, btn) {
         if (!verifierConfig()) return;
 
@@ -3185,42 +3227,8 @@
 
             listDiv.innerHTML = "";
             commits.forEach((commit, index) => {
-                const date = new Date(commit.commit.author.date);
-                const dateStr = date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
-                    + " à " + date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-                const msg = commit.commit.message;
                 const estActuelle = index === 0;
-
-                const item = document.createElement('div');
-                item.className = 'commit-item' + (estActuelle ? ' current' : '');
-                item.innerHTML = `
-                    <div class="commit-date">${dateStr}${estActuelle ? '<span class="commit-badge">Version actuelle</span>' : ''}</div>
-                    <div class="commit-msg">${echapperHtml(msg)}</div>
-                    <div class="commit-actions">
-                        <button class="btn-small btn-view">Voir</button>
-                        <button class="btn-small btn-copy">Copier</button>
-                        <button class="btn-small btn-download">Télécharger</button>
-                        ${estActuelle ? '' : '<button class="btn-small btn-restore">Restaurer</button>'}
-                    </div>`;
-
-                const btnVoir = item.querySelector('.btn-view');
-                attacherTooltip(btnVoir, `Affiche le contenu complet de cette version du ${dateStr} dans une fenêtre séparée, sans rien modifier ni republier — pratique pour relire ou comparer avant de restaurer.`);
-                btnVoir.addEventListener('click', () => voirVersionFichier(repo, chemin, commit.sha, dateStr, statutDiv));
-
-                const btnCopier = item.querySelector('.btn-copy');
-                attacherTooltip(btnCopier, `Copie dans le presse-papier le contenu complet de cette version du ${dateStr}, par exemple pour le recoller dans la zone ci-dessus et le modifier avant de le redéployer.`);
-                btnCopier.addEventListener('click', (e) => copierVersionFichier(repo, chemin, commit.sha, dateStr, e.target, statutDiv));
-
-                const btnTelecharger = item.querySelector('.btn-download');
-                attacherTooltip(btnTelecharger, `Télécharge cette version du ${dateStr} sous forme de fichier sur cet appareil, sans rien changer sur GitHub.`);
-                btnTelecharger.addEventListener('click', (e) => telechargerVersionFichier(repo, chemin, commit.sha, dateStr, e.target, statutDiv));
-
-                const btnRestore = item.querySelector('.btn-restore');
-                if (btnRestore) {
-                    attacherTooltip(btnRestore, `Republie le contenu de cette version du ${dateStr} en créant un NOUVEAU commit sur « ${chemin} ». La version actuelle n'est pas effacée : elle reste dans l'historique et tu pourras toujours y revenir ensuite.`);
-                    btnRestore.addEventListener('click', () => restaurerVersionFichier(repo, chemin, branche, commit.sha, dateStr, listDiv, statutDiv, btn));
-                }
-
+                const item = construireElementCommitFichier(repo, chemin, branche, commit, estActuelle, listDiv, statutDiv, btn);
                 listDiv.appendChild(item);
             });
         } catch (error) {
@@ -3229,6 +3237,114 @@
         }
 
         btn.disabled = false;
+    }
+
+    // Appui long (> 5 s) sur un bouton « Charger l'historique » de la section
+    // « Gérer les autres fichiers » : le bouton devient rouge et l'appli
+    // ajoute en continu les commits plus anciens à la liste déjà affichée,
+    // page GitHub par page GitHub. Un simple appui sur le bouton pendant
+    // qu'il est rouge arrête ce chargement continu.
+    const DUREE_APPUI_LONG_HISTORIQUE_MS = 5000;
+    const TAILLE_PAGE_EXTENSION_HISTORIQUE = 10;
+
+    function activerAppuiLongHistorique(bouton, repo, chemin, branche, listDiv, statutDiv) {
+        let timerAppuiLong = null;
+        let appuiLongDeclenche = false;
+        let extensionActive = false;
+        let extensionDoitSarreter = false;
+
+        function demarrerMinuteur() {
+            if (bouton.disabled || extensionActive) return;
+            appuiLongDeclenche = false;
+            clearTimeout(timerAppuiLong);
+            timerAppuiLong = setTimeout(() => {
+                appuiLongDeclenche = true;
+                demarrerExtension();
+            }, DUREE_APPUI_LONG_HISTORIQUE_MS);
+        }
+
+        function annulerMinuteur() {
+            clearTimeout(timerAppuiLong);
+        }
+
+        function activerApparenceExtension() {
+            bouton.style.backgroundColor = '#ff3b30';
+            bouton.textContent = '⏳ Historique complet… (toucher pour arrêter)';
+        }
+
+        function desactiverApparenceExtension() {
+            bouton.style.backgroundColor = '';
+            bouton.textContent = "Charger l'historique";
+        }
+
+        async function demarrerExtension() {
+            if (extensionActive) return;
+            if (!verifierConfig()) return;
+            extensionActive = true;
+            extensionDoitSarreter = false;
+            activerApparenceExtension();
+
+            while (extensionActive && !extensionDoitSarreter) {
+                const nbAffiches = listDiv.querySelectorAll('.commit-item').length;
+
+                // La dernière page reçue contenait moins d'une page pleine :
+                // on est déjà au bout de l'historique, inutile de refaire un appel.
+                if (nbAffiches > 0 && nbAffiches % TAILLE_PAGE_EXTENSION_HISTORIQUE !== 0) {
+                    afficherStatutCarte(statutDiv, `Historique complet déjà affiché pour « ${chemin} » (aucune version plus ancienne).`, "success");
+                    break;
+                }
+
+                const pageSuivante = Math.floor(nbAffiches / TAILLE_PAGE_EXTENSION_HISTORIQUE) + 1;
+                let commits;
+                try {
+                    commits = await recupererCommitsFichier(repo, chemin, TAILLE_PAGE_EXTENSION_HISTORIQUE, pageSuivante);
+                } catch (e) {
+                    afficherStatutCarte(statutDiv, `Chargement de l'historique complet interrompu pour « ${chemin} » : ${e.message}`, "error");
+                    break;
+                }
+
+                if (extensionDoitSarreter) break;
+
+                if (!commits || commits.length === 0) {
+                    afficherStatutCarte(statutDiv, `Historique complet chargé pour « ${chemin} » (aucune version plus ancienne).`, "success");
+                    break;
+                }
+
+                commits.forEach(commit => {
+                    const item = construireElementCommitFichier(repo, chemin, branche, commit, false, listDiv, statutDiv, bouton);
+                    listDiv.appendChild(item);
+                });
+
+                if (commits.length < TAILLE_PAGE_EXTENSION_HISTORIQUE) {
+                    afficherStatutCarte(statutDiv, `Historique complet chargé pour « ${chemin} » (aucune version plus ancienne).`, "success");
+                    break;
+                }
+            }
+
+            extensionActive = false;
+            desactiverApparenceExtension();
+        }
+
+        bouton.addEventListener('mousedown', (e) => { if (e.button !== 0) return; demarrerMinuteur(); });
+        bouton.addEventListener('touchstart', () => demarrerMinuteur(), { passive: true });
+        ['mouseup', 'mouseleave', 'touchend', 'touchcancel'].forEach(ev => {
+            bouton.addEventListener(ev, annulerMinuteur);
+        });
+
+        bouton.addEventListener('click', (e) => {
+            if (appuiLongDeclenche) {
+                // Ce clic est celui qui suit le relâchement de l'appui long
+                // lui-même : on l'ignore pour ne pas déclencher une action en plus.
+                appuiLongDeclenche = false;
+                e.preventDefault();
+                return;
+            }
+            if (extensionActive) {
+                extensionDoitSarreter = true;
+                return;
+            }
+            chargerHistoriqueFichier(repo, chemin, branche, listDiv, statutDiv, bouton);
+        });
     }
 
     function construireCarteFichier(repo, chemin, branche) {
@@ -3286,7 +3402,7 @@
         btnHistorique.className = 'btn';
         btnHistorique.style.cssText = 'background-color:#ff9500; margin-top:5px;';
         btnHistorique.textContent = "Charger l'historique";
-        attacherTooltip(btnHistorique, `Récupère la liste des commits (versions successives) de « ${chemin} », avec leur date et leur commentaire de version, pour pouvoir ensuite consulter, copier, télécharger ou restaurer une ancienne version ci-dessous.`);
+        attacherTooltip(btnHistorique, `Récupère la liste des commits (versions successives) de « ${chemin} », avec leur date et leur commentaire de version, pour pouvoir ensuite consulter, copier, télécharger ou restaurer une ancienne version ci-dessous. Reste appuyé plus de 5 secondes pour charger tout l'historique en continu (le bouton devient rouge) ; un simple appui dessus pendant qu'il est rouge arrête le chargement.`);
 
         const historiqueStatut = document.createElement('div');
         historiqueStatut.className = 'status';
@@ -3295,7 +3411,7 @@
         const historiqueListe = document.createElement('div');
         historiqueListe.style.marginTop = '10px';
 
-        btnHistorique.addEventListener('click', () => chargerHistoriqueFichier(repo, chemin, branche, historiqueListe, historiqueStatut, btnHistorique));
+        activerAppuiLongHistorique(btnHistorique, repo, chemin, branche, historiqueListe, historiqueStatut);
 
         card.appendChild(btnHistorique);
         card.appendChild(historiqueStatut);
