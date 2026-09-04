@@ -353,6 +353,22 @@
             -webkit-user-select: text;
         }
         .modal-btn-copier { background: #34c759; color: #fff; }
+        .commentaires-zone {
+            width: 100%;
+            min-height: 220px;
+            box-sizing: border-box;
+            font-family: "SF Mono", Menlo, Consolas, monospace;
+            font-size: 12.5px;
+            line-height: 1.5;
+            color: #1d1d1f;
+            background: #f5f5f7;
+            border: 1px solid #e5e5ea;
+            border-radius: 10px;
+            padding: 12px;
+            resize: vertical;
+        }
+        .modal-btn-valider { background: #5856d6; color: #fff; }
+        .modal-btn-valider:active { background: #4644b8; }
         .modal-btn-copier:active { background: #28a745; }
 
         .tooltip-detaille {
@@ -379,7 +395,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.18</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.19</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -440,6 +456,8 @@
                 <button class="btn" id="btn-charger-depots" onclick="chargerListeDepots(false)" style="background-color: #6e6e73; margin-bottom: 15px;" data-tip="Interroge l'API GitHub pour récupérer (ou mettre à jour) la liste complète de tes dépôts. Cette liste sert à préremplir les suggestions du champ « Nom du dépôt » et à alimenter le menu déroulant juste en dessous, pour choisir un dépôt existant sans avoir à retaper son nom.">🔄 Charger / rafraîchir la liste de mes dépôts</button>
 
                 <button class="btn" id="btn-inventaire-depots" onclick="copierInventaireDepots(this)" style="background-color: #34c759; margin-bottom: 15px;" data-tip="Parcourt tous tes dépôts GitHub et dresse la liste de leurs fichiers, en indiquant d'abord, pour chaque dépôt, le nom des fichiers HTML qu'il contient. Le texte obtenu est copié automatiquement dans le presse-papier et affiché dans une fenêtre où tu peux le relire et le recopier si besoin.">📋 Copier l'inventaire des dépôts (fichiers HTML en tête)</button>
+
+                <button class="btn" id="btn-commentaires-html" onclick="ouvrirFenetreCommentaires()" style="background-color: #af52de; margin-bottom: 15px;" data-tip="Ouvre une fenêtre où coller le JSON de commentaires produit par ChatGPT ou Claude à partir de l'inventaire copié juste au-dessus, puis l'enregistre sur GitHub dans le fichier commentaires-html.json, rangé à côté de cibles.json dans le dépôt de synchronisation de la section 5. Les commentaires déjà présents pour d'autres fichiers sont conservés ; ceux d'un même dépôt et d'un même fichier sont remplacés.">💬 Enregistrer les commentaires HTML (JSON)</button>
 
                 <button class="btn btn-secondary" onclick="ajouterCible()" data-tip="Enregistre localement, dans ce navigateur, une nouvelle application cible à partir du nom d'affichage et du nom de dépôt renseignés au-dessus. Cette cible apparaîtra ensuite dans les menus de déploiement (section 3) et d'historique (section 4), ainsi que dans la liste synchronisable (section 5).">Ajouter cette cible</button>
 
@@ -570,6 +588,25 @@
         <div class="modal-actions">
             <button id="modal-cancel" class="modal-btn modal-btn-cancel">Annuler</button>
             <button id="modal-confirm" class="modal-btn modal-btn-confirm">Confirmer</button>
+        </div>
+    </div>
+</div>
+
+<!-- Fenêtre d'enregistrement des commentaires des fichiers HTML -->
+<div id="commentaires-overlay" class="modal-overlay">
+    <div class="modal-box modal-box-large">
+        <div class="modal-titre">💬 Commentaires des fichiers HTML</div>
+        <div style="font-size:13px; color:#86868b; margin-bottom:10px;">
+            Colle ici le JSON renvoyé par ChatGPT ou Claude à partir de l'inventaire des dépôts.
+            Il sera enregistré sur GitHub dans <strong id="commentaires-cible">commentaires-html.json</strong>,
+            à côté de <em>cibles.json</em>.
+        </div>
+        <textarea id="commentaires-zone" class="commentaires-zone" placeholder='{ "commentaires": [ { "depot": "...", "fichier": "index.html", "commentaire": "..." } ] }' spellcheck="false" autocomplete="off"></textarea>
+        <div id="commentaires-statut" style="font-size:13px; color:#86868b; margin-top:10px; white-space:pre-wrap;"></div>
+        <div class="modal-actions" style="margin-top:14px; flex-wrap:wrap;">
+            <button class="modal-btn modal-btn-cancel" onclick="fermerFenetreCommentaires()">Fermer</button>
+            <button id="commentaires-coller" class="modal-btn modal-btn-copier" onclick="collerCommentairesDepuisPressePapier(this)">📋 Coller</button>
+            <button id="commentaires-enregistrer" class="modal-btn modal-btn-valider" onclick="enregistrerCommentairesHtml(this)">💾 Enregistrer sur GitHub</button>
         </div>
     </div>
 </div>
@@ -1412,6 +1449,48 @@
 
     let inventaireTexteCourant = "";
 
+    // Texte placé en tête de l'inventaire : la demande à adresser telle quelle à une IA,
+    // avec le format JSON attendu par Le Déployeur pour les commentaires des fichiers HTML.
+    const PREAMBULE_INVENTAIRE = [
+        "===== DEMANDE — À COLLER TELLE QUELLE DANS CHATGPT OU CLAUDE =====",
+        "",
+        "Pour chacun des fichiers HTML identifiés dans l'inventaire ci-dessous, rédige un petit",
+        "résumé de ce que fait l'application, qui ne fasse pas plus de trois ou quatre lignes.",
+        "",
+        "Rends-moi un fichier JSON — et uniquement le JSON, sans phrase d'introduction ni balises",
+        "de code — contenant, pour chaque fichier HTML : le nom du fichier, le nom du dépôt dans",
+        "lequel il se trouve, et le texte que tu auras rédigé sur ce que fait l'application.",
+        "",
+        "Ce JSON doit respecter exactement le format utilisé par l'application « Le Déployeur »",
+        "pour aller chercher le commentaire associé à chacun des fichiers HTML :",
+        "",
+        "{",
+        '  "commentaires": [',
+        "    {",
+        '      "depot": "nom-du-depot",',
+        '      "fichier": "chemin/vers/le-fichier.html",',
+        '      "commentaire": "Résumé de trois ou quatre lignes de ce que fait l\'application."',
+        "    }",
+        "  ]",
+        "}",
+        "",
+        "Règles à respecter :",
+        "  - une entrée par fichier HTML de l'inventaire, sans omission ni ajout ;",
+        '  - "depot" reprend exactement le nom du dépôt tel qu\'il apparaît après le 📦 ;',
+        '  - "fichier" reprend exactement le chemin du fichier tel qu\'il apparaît dans la liste',
+        "    « Fichiers HTML » du dépôt concerné (par exemple public/Index.html) ;",
+        '  - "commentaire" est un texte suivi, sans retour à la ligne, de trois ou quatre lignes ;',
+        "  - si tu n'as pas le contenu d'un fichier, déduis-en le rôle du nom du dépôt et des",
+        "    fichiers annexes, et commence le commentaire par « Probablement : » ;",
+        '  - n\'ajoute pas de champ "maj" : Le Déployeur le renseigne lui-même à l\'enregistrement.',
+        "",
+        "Copie ensuite le JSON obtenu, puis enregistre-le avec le bouton « 💬 Enregistrer les",
+        "commentaires HTML (JSON) » de la section 2 du Déployeur.",
+        "",
+        "===== INVENTAIRE =====",
+        ""
+    ];
+
     async function listerTousLesFichiers(repo, branche) {
         const url = `https://api.github.com/repos/${config.user}/${repo}/git/trees/${encodeURIComponent(branche)}?recursive=1`;
         const rep = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
@@ -1477,6 +1556,7 @@
 
             const maintenant = new Date();
             const lignes = [];
+            PREAMBULE_INVENTAIRE.forEach(l => lignes.push(l));
             lignes.push(`Inventaire des dépôts GitHub de ${config.user}`);
             lignes.push(`${repos.length} dépôt(s) — généré le ${maintenant.toLocaleDateString('fr-FR')} à ${maintenant.toLocaleTimeString('fr-FR')}`);
             lignes.push("");
@@ -1560,6 +1640,221 @@
             );
         } finally {
             if (bouton) { bouton.disabled = false; bouton.textContent = texteOrigine; }
+        }
+    }
+
+    // ---------- Commentaires des fichiers HTML (commentaires-html.json) ----------
+
+    const NOM_FICHIER_COMMENTAIRES = "commentaires-html.json";
+
+    // Range le fichier des commentaires à côté du fichier de synchro des cibles :
+    // même dépôt, même dossier, nom fixe.
+    function cheminCommentaires() {
+        const chemin = lireConfigSync().chemin || 'cibles.json';
+        const pos = chemin.lastIndexOf('/');
+        return pos === -1 ? NOM_FICHIER_COMMENTAIRES : chemin.slice(0, pos + 1) + NOM_FICHIER_COMMENTAIRES;
+    }
+
+    function afficherStatutCommentaires(texte, type) {
+        const el = document.getElementById('commentaires-statut');
+        if (!el) return;
+        el.textContent = texte || "";
+        el.style.color = type === 'error' ? '#d70015' : (type === 'success' ? '#2e7d32' : '#86868b');
+    }
+
+    function ouvrirFenetreCommentaires() {
+        const sync = lireConfigSync();
+        const cible = document.getElementById('commentaires-cible');
+        if (cible) {
+            cible.textContent = sync.repo
+                ? `${config.user || '(utilisateur)'} / ${sync.repo} / ${cheminCommentaires()}`
+                : NOM_FICHIER_COMMENTAIRES;
+        }
+        if (!sync.repo) {
+            afficherStatutCommentaires(
+                "Aucun dépôt de synchronisation n'est configuré : renseigne-le à la section 5 " +
+                "(le fichier des commentaires est rangé à côté de cibles.json).",
+                "error"
+            );
+        } else {
+            afficherStatutCommentaires("");
+        }
+        document.getElementById('commentaires-overlay').classList.add('visible');
+    }
+
+    function fermerFenetreCommentaires() {
+        document.getElementById('commentaires-overlay').classList.remove('visible');
+    }
+
+    async function collerCommentairesDepuisPressePapier(bouton) {
+        const zone = document.getElementById('commentaires-zone');
+        const origine = bouton ? bouton.textContent : null;
+        if (bouton) { bouton.disabled = true; bouton.textContent = "Lecture…"; }
+        try {
+            const texte = await navigator.clipboard.readText();
+            if (!texte || !texte.trim()) {
+                afficherStatutCommentaires("Le presse-papier est vide.", "error");
+            } else {
+                if (zone.value.trim() && zone.value.trim() !== texte.trim()) {
+                    const ok = await confirmerModal(
+                        "Remplacer le contenu déjà présent dans la zone par celui du presse-papier ?",
+                        "Remplacer", "Annuler"
+                    );
+                    if (!ok) return;
+                }
+                zone.value = texte;
+                afficherStatutCommentaires("Contenu collé — vérifie-le puis enregistre.", "success");
+            }
+        } catch (_) {
+            afficherStatutCommentaires(
+                "Lecture du presse-papier refusée par le navigateur : colle le JSON à la main " +
+                "dans la zone ci-dessus (appui long → Coller).",
+                "error"
+            );
+        } finally {
+            if (bouton) {
+                bouton.disabled = false;
+                bouton.textContent = origine || "📋 Coller";
+            }
+        }
+    }
+
+    // Accepte { commentaires: [...] } ou un tableau nu, et tolère les balises de code
+    // ainsi que quelques variantes de noms de champs.
+    function analyserJsonCommentaires(texteBrut) {
+        let texte = (texteBrut || "").trim();
+        if (!texte) throw new Error("La zone est vide : colle d'abord le JSON produit par l'IA.");
+
+        texte = texte.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+        const debut = texte.search(/[\[{]/);
+        if (debut > 0) texte = texte.slice(debut);
+
+        let obj;
+        try { obj = JSON.parse(texte); }
+        catch (e) { throw new Error("Ce n'est pas du JSON valide (" + e.message + ")."); }
+
+        const brut = Array.isArray(obj) ? obj : (Array.isArray(obj.commentaires) ? obj.commentaires : null);
+        if (!brut) throw new Error("JSON valide, mais sans tableau « commentaires ».");
+
+        const entrees = [];
+        brut.forEach((e, i) => {
+            if (!e || typeof e !== 'object') return;
+            const depot = (e.depot || e.repo || e.depôt || "").toString().trim();
+            const fichier = (e.fichier || e.file || e.chemin || "").toString().trim();
+            const commentaire = (e.commentaire || e.resume || e.résumé || e.description || "").toString().trim();
+            if (!depot || !fichier) throw new Error(`Entrée n°${i + 1} incomplète : « depot » et « fichier » sont obligatoires.`);
+            entrees.push({ depot: depot, fichier: fichier, commentaire: commentaire });
+        });
+
+        if (!entrees.length) throw new Error("Aucune entrée exploitable dans ce JSON.");
+        return entrees;
+    }
+
+    async function lireCommentairesDistants() {
+        const sync = lireConfigSync();
+        const url = `https://api.github.com/repos/${config.user}/${sync.repo}/contents/${encodeURIComponent(cheminCommentaires())}`;
+        const r = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
+        if (r.status === 404) return { entrees: [], sha: null };
+        if (!r.ok) {
+            let detail = `${r.status} ${r.statusText}`;
+            try { const e = await r.json(); if (e && e.message) detail = e.message; } catch (_) {}
+            throw new Error(detail);
+        }
+        const data = await r.json();
+        let obj;
+        try { obj = JSON.parse(decoderBase64(data.content)); }
+        catch (_) { throw new Error("Le fichier de commentaires présent sur GitHub n'est pas un JSON valide."); }
+        const arr = Array.isArray(obj) ? obj : (Array.isArray(obj.commentaires) ? obj.commentaires : []);
+        return { entrees: arr, sha: data.sha };
+    }
+
+    function cleCommentaire(e) { return `${e.depot}||${e.fichier}`; }
+
+    async function enregistrerCommentairesHtml(bouton) {
+        if (!config.user || !config.token) {
+            afficherStatutCommentaires("Renseigne d'abord tes identifiants GitHub à l'étape 1.", "error");
+            return;
+        }
+        const sync = lireConfigSync();
+        if (!sync.repo) {
+            afficherStatutCommentaires(
+                "Aucun dépôt de synchronisation configuré : renseigne-le à la section 5.",
+                "error"
+            );
+            return;
+        }
+
+        let entrees;
+        try {
+            entrees = analyserJsonCommentaires(document.getElementById('commentaires-zone').value);
+        } catch (e) {
+            afficherStatutCommentaires(e.message, "error");
+            return;
+        }
+
+        const origine = bouton ? bouton.textContent : null;
+        if (bouton) { bouton.disabled = true; bouton.textContent = "Lecture GitHub…"; }
+
+        try {
+            const distant = await lireCommentairesDistants();
+
+            const fusion = new Map();
+            distant.entrees.forEach(e => {
+                if (e && e.depot && e.fichier) fusion.set(cleCommentaire(e), e);
+            });
+
+            let ajouts = 0, remplaces = 0;
+            entrees.forEach(e => {
+                const cle = cleCommentaire(e);
+                if (fusion.has(cle)) remplaces++; else ajouts++;
+                fusion.set(cle, e);
+            });
+
+            const liste = Array.from(fusion.values()).sort((a, b) =>
+                a.depot.localeCompare(b.depot) || a.fichier.localeCompare(b.fichier));
+
+            const conserves = liste.length - ajouts - remplaces;
+            const ok = await confirmerModal(
+                `Enregistrer ${entrees.length} commentaire(s) dans ${sync.repo}/${cheminCommentaires()} ?\n\n` +
+                `• ${ajouts} nouveau(x)\n• ${remplaces} mis à jour\n• ${conserves} conservé(s) tel(s) quel(s)\n\n` +
+                `Le fichier contiendra au total ${liste.length} entrée(s).`,
+                "Enregistrer", "Annuler"
+            );
+            if (!ok) {
+                afficherStatutCommentaires("Enregistrement annulé — rien n'a été modifié sur GitHub.");
+                return;
+            }
+
+            if (bouton) bouton.textContent = "Envoi…";
+
+            const contenu = JSON.stringify({ commentaires: liste, maj: new Date().toISOString() }, null, 2);
+            const url = `https://api.github.com/repos/${config.user}/${sync.repo}/contents/${encodeURIComponent(cheminCommentaires())}`;
+            const body = {
+                message: `Commentaires des fichiers HTML (${liste.length}) via Le Déployeur`,
+                content: encoderBase64(contenu)
+            };
+            if (distant.sha) body.sha = distant.sha;
+
+            const rep = await fetch(url, { method: "PUT", headers: headersGitHub(), body: JSON.stringify(body) });
+            if (!rep.ok) {
+                let detail = `${rep.status} ${rep.statusText}`;
+                try { const e = await rep.json(); if (e && e.message) detail = e.message; } catch (_) {}
+                throw new Error(detail);
+            }
+
+            afficherStatutCommentaires(
+                `✅ Enregistré : ${liste.length} entrée(s) dans ${cheminCommentaires()} ` +
+                `(${ajouts} ajout(s), ${remplaces} mise(s) à jour).`,
+                "success"
+            );
+            afficherMessage(`Commentaires HTML enregistrés sur GitHub (${liste.length} entrée(s)).`, "success");
+        } catch (error) {
+            afficherStatutCommentaires(`Échec de l'enregistrement : ${error.message}`, "error");
+        } finally {
+            if (bouton) {
+                bouton.disabled = false;
+                bouton.textContent = origine || "💾 Enregistrer sur GitHub";
+            }
         }
     }
 
@@ -3903,6 +4198,9 @@
     // Initialisation au chargement de la page
     document.getElementById('inventaire-overlay').addEventListener('click', function (e) {
         if (e.target === this) fermerInventaireDepots();
+    });
+    document.getElementById('commentaires-overlay').addEventListener('click', function (e) {
+        if (e.target === this) fermerFenetreCommentaires();
     });
     initTooltips();
     rafraichirCiblesUI();
