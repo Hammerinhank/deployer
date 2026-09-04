@@ -53,7 +53,7 @@
       "repo": "boxinternet"
     },
     {
-      "name": "Planning des profs de Vietnamien",
+      "name": "Planning des profs de Vietnamien\nProbablement : page de planning des cours avec les professeurs. Elle présente les créneaux prévus sous forme d'agenda ou de tableau afin de visualiser d'un coup d'œil la répartition des leçons sur la semaine et d'éviter les chevauchements.",
       "repo": "planningprofesseurs"
     },
     {
@@ -77,5 +77,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-09-04T08:38:38.752Z"
+  "maj": "2026-09-04T08:39:05.613Z"
 }
