@@ -1,0 +1,140 @@
+{
+  "commentaires": [
+    {
+      "depot": "analyserTexteVietnamien",
+      "fichier": "index.html",
+      "commentaire": "Probablement : outil d'analyse de texte vietnamien. On colle un texte et l'application le décompose (mots, syllabes, tons, sens) pour en faciliter l'étude, avec mise en couleur du vocabulaire et renvoi vers une IA pour approfondir un mot. Complément des autres outils d'apprentissage du vietnamien."
+    },
+    {
+      "depot": "anniversaires",
+      "fichier": "index.html",
+      "commentaire": "Application « Anniversaires & Fêtes » : gestion d'une liste d'anniversaires et de fêtes persistée dans data/anniversaires.json sur GitHub. Un workflow GitHub Actions quotidien exécute scripts/envoyer_rappels.py, qui envoie un rappel par mail la veille de chaque échéance, sans qu'aucun navigateur ait besoin d'être ouvert."
+    },
+    {
+      "depot": "app-pente",
+      "fichier": "index.html",
+      "commentaire": "« Pente — inclinomètre GPS » : mesure en temps réel la pente de la route en % à partir de l'altitude GPS, avec verrouillage d'une section tous les 100 m parcourus (2 km en mode Avion). Graphiques du relief et de la pente, carte du parcours, récapitulatif persistant des sections organisées en séries, calcul de pente moyenne entre deux points. Fonctionne hors ligne."
+    },
+    {
+      "depot": "Audio",
+      "fichier": "index.html",
+      "commentaire": "« Bande-son — extraction & analyse » : charge une vidéo, en extrait la piste audio via l'API Web Audio et l'exporte en WAV 16 bits. Analyse complète du son : durée, échantillonnage, crête/RMS en dBFS, forme d'onde, spectrogramme FFT, spectre moyen et spectre temps réel à la lecture. Tout se fait localement, avec mémorisation de la vidéo et des réglages en IndexedDB."
+    },
+    {
+      "depot": "boxinternet",
+      "fichier": "index.html",
+      "commentaire": "Application « Journal » de surveillance de la box internet : lit le fichier activity.json du dépôt via l'API GitHub et présente les relevés réseau. Deux vues, le JSON brut mis en forme et un résumé d'une ligne par enregistrement (réseau OK, panne, reboot déclenché), classé du plus récent au plus ancien, avec un encadré résumant en français clair le dernier relevé."
+    },
+    {
+      "depot": "CaaaG",
+      "fichier": "public/Iframe.html",
+      "commentaire": "Probablement : page d'affichage embarquée du site CaaaG (application Node/Express), destinée à être incluse dans un cadre par l'interface principale. Elle sert à présenter le document ou le contenu converti (docx/xml vers HTML) dans une zone isolée du reste de l'interface."
+    },
+    {
+      "depot": "CaaaG",
+      "fichier": "public/Index.html",
+      "commentaire": "Probablement : interface principale de l'application web CaaaG, hébergée en Node/Express et déployée via GitHub Actions sur Azure. Elle regroupe la conversion de documents Word en HTML, l'exploration arborescente des fichiers, la recherche par thèmes et règles, ainsi que les outils annexes (scanner, worker, décompression 7-Zip)."
+    },
+    {
+      "depot": "CaaaG",
+      "fichier": "public/realtime.html",
+      "commentaire": "Probablement : page « temps réel » de l'application CaaaG, associée au script realtime.js. Elle affiche en direct l'avancement des traitements lancés côté serveur (conversion, analyse, scan de fichiers) et les messages émis pendant leur exécution."
+    },
+    {
+      "depot": "codehtml",
+      "fichier": "index.html",
+      "commentaire": "Application « Éditeur & Prévisualisation HTML » organisée en trois zones repliables : préparation d'une requête pour ChatGPT, pipeline de mise en forme du texte obtenu, puis éditeur HTML avec aperçu. Elle propose la colorisation « Aérer Sections », l'enrobage des hyperliens et le nettoyage de conversation. Le contenu est persisté sur GitHub dans data.json."
+    },
+    {
+      "depot": "creerAlbumPhoto",
+      "fichier": "index.html",
+      "commentaire": "Probablement : outil de création d'albums photo. Il permet de sélectionner un ensemble d'images, de les organiser et de les regrouper en album présentable, en s'appuyant sur le navigateur pour l'aperçu et la mise en page, sans traitement serveur."
+    },
+    {
+      "depot": "deployer",
+      "fichier": "index.html",
+      "commentaire": "« Le Déployeur d'Apps » : outil central de gestion des dépôts GitHub et des applications publiées sur GitHub Pages. Il enregistre les identifiants et la liste des cibles (cibles.json), pousse un nouveau code HTML vers le dépôt choisi avec vérification après déploiement, gère l'historique des commits et la restauration de versions, l'édition des autres fichiers, la création de dépôts et un scan de sécurité des jetons."
+    },
+    {
+      "depot": "DepotCreeAutomatiquement",
+      "fichier": "index.html",
+      "commentaire": "Probablement : page de départ d'un dépôt créé automatiquement par la fonction de création de dépôt du Déployeur. Elle sert de squelette minimal pour vérifier que le dépôt, la publication GitHub Pages et le déploiement fonctionnent, avant d'y installer une vraie application."
+    },
+    {
+      "depot": "genealogie",
+      "fichier": "index.html",
+      "commentaire": "« Éventail généalogique » : affiche un arbre de descendance en arc de cercle, générations concentriques, à la manière des chartes généalogiques papier. L'application permet d'éditer les personnes, de déplacer des branches entières par glisser-déposer, de gérer plusieurs généalogies et de sauvegarder ou restaurer les données via genealogie.json sur GitHub."
+    },
+    {
+      "depot": "hueblink",
+      "fichier": "hueblink/log.html",
+      "commentaire": "Probablement : page de journal du projet hueblink, une application Node/Express pilotant des ampoules Philips Hue via l'API du pont et l'authentification OAuth. Elle affiche l'historique des appels et des commandes envoyées aux lampes, utile pour diagnostiquer les problèmes de jeton ou de connexion."
+    },
+    {
+      "depot": "hueblink",
+      "fichier": "hueblink/public/log.html",
+      "commentaire": "Probablement : version publiée (servie comme fichier statique) de la page de journal de hueblink. Même rôle que hueblink/log.html : consultation des évènements et des échanges avec le pont Philips Hue depuis le navigateur."
+    },
+    {
+      "depot": "mon-projet",
+      "fichier": "index.html",
+      "commentaire": "« Vocabulaire & IA » : jeu d'association de mots vietnamien/français en deux colonnes, alimenté par un fichier de vocabulaire hébergé sur GitHub. Modes de masquage progressifs, défi écriture, comptage et visualisation de la progression par section, édition et nettoyage des données, requêtes ChatGPT paramétrables. La progression est synchronisée sur GitHub (vocab-progress.json)."
+    },
+    {
+      "depot": "niveau",
+      "fichier": "index.html",
+      "commentaire": "Probablement : application de niveau à bulle utilisant les capteurs d'orientation du téléphone. Elle affiche en temps réel l'inclinaison de l'appareil selon les deux axes, avec un repère visuel indiquant l'horizontalité, pour vérifier la planéité d'une surface."
+    },
+    {
+      "depot": "nom_projet_Claude",
+      "fichier": "index.html",
+      "commentaire": "Probablement : dépôt d'essai créé pour tester la chaîne complète de création de dépôt, de publication GitHub Pages et de déploiement depuis Le Déployeur. La page ne contient qu'un contenu de démonstration servant à vérifier que le site se lance."
+    },
+    {
+      "depot": "NombreDeCoursDeViernamienParProfesseur",
+      "fichier": "index.html",
+      "commentaire": "Tableau de bord du suivi des professeurs de vietnamien : affiche, pour chaque professeur, le nombre de cours donnés et son évolution dans le temps. Les données sont collectées automatiquement par update_counts.py, lancé par un workflow GitHub Actions, et stockées dans data.json et history.json que la page lit pour construire ses tableaux et courbes."
+    },
+    {
+      "depot": "planningprofesseurs",
+      "fichier": "index.html",
+      "commentaire": "Probablement : page de planning des cours avec les professeurs. Elle présente les créneaux prévus sous forme d'agenda ou de tableau afin de visualiser d'un coup d'œil la répartition des leçons sur la semaine et d'éviter les chevauchements."
+    },
+    {
+      "depot": "restaurants",
+      "fichier": "index.html",
+      "commentaire": "Application « Restaurant » : enregistre les restaurants sur une carte Leaflet/OpenStreetMap, à la position GPS actuelle ou par appui long sur la carte, avec récupération automatique du nom et de l'adresse (Nominatim et Overpass). Édition sur place, regroupement en listes, tri, création depuis le presse-papier, le tout persisté en local et synchronisé sur GitHub dans restaurants.json."
+    },
+    {
+      "depot": "Supp-doublon",
+      "fichier": "index.html",
+      "commentaire": "« Supprime-doublon » : outil de gestion des dépôts GitHub qui liste les fichiers avec leur casse exacte et repère les doublons de casse (index.html contre Index.html) avant suppression fiable. Il parcourt aussi tous les dépôts et gists, affiche pour chaque fichier son type, son nombre de commits et sa taille, et permet d'en voir le contenu brut, la structure JSON ou l'aperçu HTML rendu."
+    },
+    {
+      "depot": "test-app",
+      "fichier": "index.html",
+      "commentaire": "Page de géolocalisation avec carte Leaflet et OpenStreetMap servant de banc d'essai : affiche la position courante et l'adresse obtenue par géocodage inverse. Elle sert de point d'entrée au dépôt qui héberge aussi l'application de stationnement et les fichiers de trajets."
+    },
+    {
+      "depot": "test-app",
+      "fichier": "localisation.html",
+      "commentaire": "Application de stationnement « Je suis garé ici » : mémorise l'emplacement de la voiture, affiche la distance à vol d'oiseau et conserve l'historique des stationnements, chiffré en AES-GCM et synchronisé dans parkings.json. Elle intègre aussi une mesure de pente et la génération de récits de voyage à partir des relevés GPS enregistrés dans le dossier trajets."
+    },
+    {
+      "depot": "Tourisme",
+      "fichier": "index.html",
+      "commentaire": "Application « Où suis-je ? » : géolocalise l'utilisateur et affiche l'adresse du lieu, des photos issues de Wikimedia Commons, l'article Wikipédia le plus proche et une carte Leaflet interactive. Un appui long permet de déplacer le repère pour consulter un autre endroit. L'historique des lieux consultés est synchronisé sur GitHub dans visites.json."
+    },
+    {
+      "depot": "vignettes",
+      "fichier": "index.html",
+      "commentaire": "Version autonome du « Tri des vignettes par mois » : affiche les vignettes lues depuis un répertoire d'images du dépôt, les organise par mois et par album, avec zoom, marquage et arborescence persistée. Import par glisser-déposer, suppression définitive avec liste d'exclusion, stockage local en IndexedDB et synchronisation des images et du manifeste sur GitHub."
+    },
+    {
+      "depot": "vins",
+      "fichier": "index.html",
+      "commentaire": "Application « Cave à Vin » : gestion complète de la cave, avec ajout et retrait de bouteilles, quantités par emplacement, photos d'étiquettes, notes et commentaires de dégustation, fenêtre d'apogée et statistiques. Tri, regroupement, recherche, listes exportables et identification d'un vin par photo via ChatGPT ou Claude. Tout est persisté localement et synchronisé sur GitHub (cave.json, images, réglages, journal)."
+    }
+  ],
+  "maj": "2026-09-04T07:56:49.935Z"
+}
