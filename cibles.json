@@ -37,7 +37,7 @@
       "repo": "mon-projet"
     },
     {
-      "name": "analyser Texte Vietnamien",
+      "name": "analyser Texte Vietnamien\nProbablement : outil d'analyse de texte vietnamien. On colle un texte et l'application le décompose (mots, syllabes, tons, sens) pour en faciliter l'étude, avec mise en couleur du vocabulaire et renvoi vers une IA pour approfondir un mot. Complément des autres outils d'apprentissage du vietnamien.",
       "repo": "analyserTexteVietnamien"
     },
     {
@@ -77,5 +77,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-09-04T08:39:31.245Z"
+  "maj": "2026-09-04T08:39:57.229Z"
 }
