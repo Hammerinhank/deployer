@@ -17,7 +17,7 @@
       "repo": "Audio"
     },
     {
-      "name": "Calcul de pente",
+      "name": "Calcul de pente\n« Pente — inclinomètre GPS » : mesure en temps réel la pente de la route en % à partir de l'altitude GPS, avec verrouillage d'une section tous les 100 m parcourus (2 km en mode Avion). Graphiques du relief et de la pente, carte du parcours, récapitulatif persistant des sections organisées en séries, calcul de pente moyenne entre deux points. Fonctionne hors ligne.",
       "repo": "app-pente"
     },
     {
@@ -77,5 +77,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-09-04T08:36:23.102Z"
+  "maj": "2026-09-04T08:37:12.091Z"
 }
