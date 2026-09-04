@@ -159,7 +159,7 @@
         .drag-handle:active { cursor: grabbing; background: #d1d1d6; }
         .drag-handle.dragging { background: #0071e3; color: #fff; }
         .target-info { flex: 1; min-width: 0; word-break: break-word; }
-        .target-nom { color: #0071e3; text-decoration: none; font-weight: 600; }
+        .target-nom { color: #0071e3; text-decoration: none; font-weight: 600; white-space: pre-line; }
         .target-repo { display: block; color: #86868b; font-size: 12px; margin-top: 2px; }
         .target-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
         .btn-edit-cible {
@@ -397,7 +397,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.22</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.23</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -1341,7 +1341,7 @@
             [select, selectHistory].forEach(s => {
                 const opt = document.createElement('option');
                 opt.value = cible.repo;
-                opt.textContent = cible.name;
+                opt.textContent = premiereLigne(cible.name);
                 s.appendChild(opt);
             });
         });
@@ -1950,7 +1950,7 @@
     async function supprimerCible(index) {
         const cible = cibles[index];
         const ok = await confirmerModal(
-            `Supprimer « ${cible.name} » de la liste des cibles ?\n\n` +
+            `Supprimer « ${premiereLigne(cible.name)} » de la liste des cibles ?\n\n` +
             "Le dépôt GitHub et son code en ligne ne seront pas touchés — seule la référence " +
             "locale à cette cible disparaîtra (et de la synchro si tu l'envoies ensuite).",
             "Supprimer",
@@ -2053,6 +2053,14 @@
         });
     }
 
+    // Un libellé peut tenir sur plusieurs lignes (commentaire ajouté à la suite) :
+    // les menus et fenêtres de sélection n'en montrent que la première.
+    function premiereLigne(texte) {
+        const t = (texte || "").toString();
+        const ligne = t.split(/\r?\n/).find(l => l.trim().length);
+        return (ligne || t).trim();
+    }
+
     function modifierLibelleCible(item, index) {
         const cible = cibles[index];
         item.innerHTML = "";
@@ -2063,11 +2071,14 @@
         label.style.marginBottom = '4px';
         label.textContent = `Libellé pour le dépôt « ${cible.repo} »`;
 
-        const input = document.createElement('input');
-        input.type = 'text';
+        const input = document.createElement('textarea');
         input.value = cible.name;
         input.placeholder = "Nom d'affichage";
+        input.rows = 3;
         input.style.marginBottom = '8px';
+        input.style.width = '100%';
+        input.style.boxSizing = 'border-box';
+        input.style.resize = 'vertical';
 
         const actions = document.createElement('div');
         actions.style.display = 'flex';
@@ -2101,7 +2112,7 @@
         });
 
         input.addEventListener('keydown', (ev) => {
-            if (ev.key === 'Enter') { ev.preventDefault(); btnSave.click(); }
+            if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey)) { ev.preventDefault(); btnSave.click(); }
             else if (ev.key === 'Escape') { ev.preventDefault(); btnCancel.click(); }
         });
 
@@ -2206,7 +2217,7 @@
         if (mode === 'remplacer' || !actuel) {
             input.value = texte;
         } else {
-            input.value = actuel + " " + texte;
+            input.value = actuel + "\n" + texte;
         }
 
         fermerCommentaireCible();
@@ -3578,7 +3589,7 @@
 
         const titre = document.createElement('h2');
         titre.style.cssText = 'font-size:15px; border-bottom:1px solid #e5e5ea; padding-bottom:8px;';
-        titre.textContent = `${cible.name} (${cible.repo})`;
+        titre.textContent = `${premiereLigne(cible.name)} (${cible.repo})`;
         blocRepo.appendChild(titre);
 
         let branche = 'main';
