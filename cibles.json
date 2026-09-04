@@ -62,7 +62,7 @@
       "coche": true
     },
     {
-      "name": "Généalogie",
+      "name": "Généalogie\n« Éventail généalogique » : affiche un arbre de descendance en arc de cercle, générations concentriques, à la manière des chartes généalogiques papier. L'application permet d'éditer les personnes, de déplacer des branches entières par glisser-déposer, de gérer plusieurs généalogies et de sauvegarder ou restaurer les données via genealogie.json sur GitHub.",
       "repo": "genealogie",
       "coche": true
     },
@@ -77,5 +77,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-09-04T08:40:26.877Z"
+  "maj": "2026-09-04T08:41:04.381Z"
 }
