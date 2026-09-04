@@ -13,7 +13,7 @@
       "repo": "test-app"
     },
     {
-      "name": "Audio pour jb",
+      "name": "Audio pour jb\n« Bande-son — extraction & analyse » : charge une vidéo, en extrait la piste audio via l'API Web Audio et l'exporte en WAV 16 bits. Analyse complète du son : durée, échantillonnage, crête/RMS en dBFS, forme d'onde, spectrogramme FFT, spectre moyen et spectre temps réel à la lecture. Tout se fait localement, avec mémorisation de la vidéo et des réglages en IndexedDB.",
       "repo": "Audio"
     },
     {
@@ -77,5 +77,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-09-04T08:28:31.713Z"
+  "maj": "2026-09-04T08:36:23.102Z"
 }
