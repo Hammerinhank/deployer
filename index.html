@@ -426,7 +426,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.24</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.25</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -669,7 +669,7 @@
             Libellé actuel : <strong id="commentaire-cible-actuel"></strong>
         </div>
         <div class="modal-actions" style="margin-top:4px; flex-wrap:wrap;">
-            <button class="modal-btn modal-btn-cancel" onclick="fermerCommentaireCible()">Ne rien faire</button>
+            <button class="modal-btn modal-btn-cancel" onclick="fermerCommentaireCible(null)">Ne rien faire</button>
             <button class="modal-btn modal-btn-copier" onclick="appliquerCommentaireCible('ajouter')">➕ Ajouter à la suite</button>
             <button class="modal-btn modal-btn-valider" onclick="appliquerCommentaireCible('remplacer')">♻️ Remplacer</button>
         </div>
@@ -2228,7 +2228,12 @@
                 return;
             }
 
-            commentaireCibleContexte = { input: input, entrees: pourCeDepot, repo: cible.repo };
+            commentaireCibleContexte = {
+                input: input,
+                entrees: pourCeDepot,
+                repo: cible.repo,
+                scrollY: window.pageYOffset || document.documentElement.scrollTop || 0
+            };
 
             document.getElementById('commentaire-cible-info').textContent =
                 `Dépôt « ${cible.repo} » — texte trouvé dans ${NOM_FICHIER_COMMENTAIRES}.`;
@@ -2249,7 +2254,9 @@
             selectFichier.onchange = afficherTexteCommentaireCible;
 
             afficherTexteCommentaireCible();
+            const yOuverture = commentaireCibleContexte.scrollY;
             document.getElementById('commentaire-cible-overlay').classList.add('visible');
+            window.scrollTo(0, yOuverture);
         } catch (error) {
             afficherMessage(`Lecture de ${NOM_FICHIER_COMMENTAIRES} impossible : ${error.message}`, "error");
         } finally {
@@ -2270,9 +2277,23 @@
             texte || "(aucun texte de commentaire pour ce fichier)";
     }
 
-    function fermerCommentaireCible() {
+    // Referme la fenêtre en remettant la page exactement là où elle était
+    // avant l'ouverture (le focus du champ faisait sauter le défilement).
+    function fermerCommentaireCible(inputAFocaliser) {
+        const y = commentaireCibleContexte ? commentaireCibleContexte.scrollY : null;
         document.getElementById('commentaire-cible-overlay').classList.remove('visible');
         commentaireCibleContexte = null;
+
+        if (inputAFocaliser) {
+            try { inputAFocaliser.focus({ preventScroll: true }); }
+            catch (_) { inputAFocaliser.focus(); }
+        }
+        if (y !== null && y !== undefined) {
+            window.scrollTo(0, y);
+            // Le clavier iOS peut décaler la page juste après : on repositionne une seconde fois.
+            setTimeout(() => window.scrollTo(0, y), 0);
+            setTimeout(() => window.scrollTo(0, y), 120);
+        }
     }
 
     function appliquerCommentaireCible(mode) {
@@ -2291,8 +2312,7 @@
             input.value = actuel + "\n" + texte;
         }
 
-        fermerCommentaireCible();
-        input.focus();
+        fermerCommentaireCible(input);
         afficherMessage(
             mode === 'remplacer'
                 ? "Libellé remplacé par le commentaire — pense à cliquer sur « Enregistrer »."
@@ -4458,7 +4478,7 @@
     });
 
     document.getElementById('commentaire-cible-overlay').addEventListener('click', function (e) {
-        if (e.target === this) fermerCommentaireCible();
+        if (e.target === this) fermerCommentaireCible(null);
     });
 
     document.getElementById('commentaires-overlay').addEventListener('click', function (e) {
