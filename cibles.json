@@ -41,7 +41,7 @@
       "repo": "analyserTexteVietnamien"
     },
     {
-      "name": "restaurants",
+      "name": "restaurants\nApplication « Restaurant » : enregistre les restaurants sur une carte Leaflet/OpenStreetMap, à la position GPS actuelle ou par appui long sur la carte, avec récupération automatique du nom et de l'adresse (Nominatim et Overpass). Édition sur place, regroupement en listes, tri, création depuis le presse-papier, le tout persisté en local et synchronisé sur GitHub dans restaurants.json.",
       "repo": "restaurants"
     },
     {
@@ -77,5 +77,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-09-04T08:39:05.613Z"
+  "maj": "2026-09-04T08:39:31.245Z"
 }
