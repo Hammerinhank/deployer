@@ -17,16 +17,16 @@
       "repo": "Tourisme"
     },
     {
-      "name": "Calcul de pente\n« Pente — inclinomètre GPS » : mesure en temps réel la pente de la route en % à partir de l'altitude GPS, avec verrouillage d'une section tous les 100 m parcourus (2 km en mode Avion). Graphiques du relief et de la pente, carte du parcours, récapitulatif persistant des sections organisées en séries, calcul de pente moyenne entre deux points. Fonctionne hors ligne.",
-      "repo": "app-pente"
-    },
-    {
       "name": "Supprimer doublons\n« Supprime-doublon » : outil de gestion des dépôts GitHub qui liste les fichiers avec leur casse exacte et repère les doublons de casse (index.html contre Index.html) avant suppression fiable. Il parcourt aussi tous les dépôts et gists, affiche pour chaque fichier son type, son nombre de commits et sa taille, et permet d'en voir le contenu brut, la structure JSON ou l'aperçu HTML rendu.",
       "repo": "Supp-doublon"
     },
     {
       "name": "vignettes\nVersion autonome du « Tri des vignettes par mois » : affiche les vignettes lues depuis un répertoire d'images du dépôt, les organise par mois et par album, avec zoom, marquage et arborescence persistée. Import par glisser-déposer, suppression définitive avec liste d'exclusion, stockage local en IndexedDB et synchronisation des images et du manifeste sur GitHub.",
       "repo": "vignettes"
+    },
+    {
+      "name": "Calcul de pente\n« Pente — inclinomètre GPS » : mesure en temps réel la pente de la route en % à partir de l'altitude GPS, avec verrouillage d'une section tous les 100 m parcourus (2 km en mode Avion). Graphiques du relief et de la pente, carte du parcours, récapitulatif persistant des sections organisées en séries, calcul de pente moyenne entre deux points. Fonctionne hors ligne.",
+      "repo": "app-pente"
     },
     {
       "name": "creerAlbumPhoto\nProbablement : outil de création d'albums photo. Il permet de sélectionner un ensemble d'images, de les organiser et de les regrouper en album présentable, en s'appuyant sur le navigateur pour l'aperçu et la mise en page, sans traitement serveur.",
@@ -81,5 +81,5 @@
     }
   ],
   "derniereCible": "restaurants",
-  "maj": "2026-09-04T20:52:56.332Z"
+  "maj": "2026-09-04T20:53:46.735Z"
 }
