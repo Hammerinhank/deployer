@@ -45,7 +45,7 @@
       "repo": "restaurants"
     },
     {
-      "name": "Pour manipuler du code html",
+      "name": "Pour manipuler du code html\nApplication « Éditeur & Prévisualisation HTML » organisée en trois zones repliables : préparation d'une requête pour ChatGPT, pipeline de mise en forme du texte obtenu, puis éditeur HTML avec aperçu. Elle propose la colorisation « Aérer Sections », l'enrobage des hyperliens et le nettoyage de conversation. Le contenu est persisté sur GitHub dans data.json.",
       "repo": "codehtml"
     },
     {
@@ -77,5 +77,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-09-04T08:45:02.334Z"
+  "maj": "2026-09-04T08:45:15.336Z"
 }
