@@ -324,6 +324,37 @@
         .modal-btn-confirm { background: #0071e3; color: #fff; }
         .modal-btn-confirm:active { background: #005bb5; }
 
+        .modal-box-large {
+            max-width: 720px;
+            text-align: left;
+            padding: 20px 18px;
+        }
+        .modal-titre {
+            font-size: 17px;
+            font-weight: 700;
+            color: #1d1d1f;
+            margin: 0 0 10px 0;
+        }
+        .inventaire-texte {
+            font-family: "SF Mono", Menlo, Consolas, monospace;
+            font-size: 12.5px;
+            line-height: 1.5;
+            color: #1d1d1f;
+            background: #f5f5f7;
+            border: 1px solid #e5e5ea;
+            border-radius: 10px;
+            padding: 12px;
+            margin: 0 0 16px 0;
+            max-height: 55vh;
+            overflow: auto;
+            white-space: pre;
+            -webkit-overflow-scrolling: touch;
+            user-select: text;
+            -webkit-user-select: text;
+        }
+        .modal-btn-copier { background: #34c759; color: #fff; }
+        .modal-btn-copier:active { background: #28a745; }
+
         .tooltip-detaille {
             position: absolute;
             display: none;
@@ -348,7 +379,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.17</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.18</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -407,6 +438,8 @@
                     <option value="">— aucun dépôt chargé —</option>
                 </select>
                 <button class="btn" id="btn-charger-depots" onclick="chargerListeDepots(false)" style="background-color: #6e6e73; margin-bottom: 15px;" data-tip="Interroge l'API GitHub pour récupérer (ou mettre à jour) la liste complète de tes dépôts. Cette liste sert à préremplir les suggestions du champ « Nom du dépôt » et à alimenter le menu déroulant juste en dessous, pour choisir un dépôt existant sans avoir à retaper son nom.">🔄 Charger / rafraîchir la liste de mes dépôts</button>
+
+                <button class="btn" id="btn-inventaire-depots" onclick="copierInventaireDepots(this)" style="background-color: #34c759; margin-bottom: 15px;" data-tip="Parcourt tous tes dépôts GitHub et dresse la liste de leurs fichiers, en indiquant d'abord, pour chaque dépôt, le nom des fichiers HTML qu'il contient. Le texte obtenu est copié automatiquement dans le presse-papier et affiché dans une fenêtre où tu peux le relire et le recopier si besoin.">📋 Copier l'inventaire des dépôts (fichiers HTML en tête)</button>
 
                 <button class="btn btn-secondary" onclick="ajouterCible()" data-tip="Enregistre localement, dans ce navigateur, une nouvelle application cible à partir du nom d'affichage et du nom de dépôt renseignés au-dessus. Cette cible apparaîtra ensuite dans les menus de déploiement (section 3) et d'historique (section 4), ainsi que dans la liste synchronisable (section 5).">Ajouter cette cible</button>
 
@@ -537,6 +570,19 @@
         <div class="modal-actions">
             <button id="modal-cancel" class="modal-btn modal-btn-cancel">Annuler</button>
             <button id="modal-confirm" class="modal-btn modal-btn-confirm">Confirmer</button>
+        </div>
+    </div>
+</div>
+
+<!-- Fenêtre d'inventaire des dépôts -->
+<div id="inventaire-overlay" class="modal-overlay">
+    <div class="modal-box modal-box-large">
+        <div class="modal-titre" id="inventaire-titre">Inventaire des dépôts</div>
+        <div id="inventaire-statut" style="font-size:13px; color:#86868b; margin-bottom:10px;"></div>
+        <pre class="inventaire-texte" id="inventaire-texte"></pre>
+        <div class="modal-actions">
+            <button id="inventaire-fermer" class="modal-btn modal-btn-cancel" onclick="fermerInventaireDepots()">Fermer</button>
+            <button id="inventaire-copier" class="modal-btn modal-btn-copier" onclick="copierInventaireAffiche(this)">Copier dans le presse-papier</button>
         </div>
     </div>
 </div>
@@ -1359,6 +1405,161 @@
             }
         } finally {
             if (btn && !silencieux) { btn.textContent = texteOrigine; btn.disabled = false; }
+        }
+    }
+
+    // ---------- Inventaire des dépôts et de leurs fichiers ----------
+
+    let inventaireTexteCourant = "";
+
+    async function listerTousLesFichiers(repo, branche) {
+        const url = `https://api.github.com/repos/${config.user}/${repo}/git/trees/${encodeURIComponent(branche)}?recursive=1`;
+        const rep = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
+        if (!rep.ok) {
+            let detail = `${rep.status} ${rep.statusText}`;
+            try { const e = await rep.json(); if (e && e.message) detail = e.message; } catch (_) {}
+            throw new Error(detail);
+        }
+        const data = await rep.json();
+        if (!Array.isArray(data.tree)) return { fichiers: [], tronque: false };
+        const fichiers = data.tree
+            .filter(f => f.type === 'blob')
+            .map(f => f.path)
+            .sort((a, b) => a.localeCompare(b));
+        return { fichiers, tronque: !!data.truncated };
+    }
+
+    function estFichierHtml(chemin) {
+        const bas = chemin.toLowerCase();
+        return bas.endsWith('.html') || bas.endsWith('.htm');
+    }
+
+    function ouvrirFenetreInventaire(texte, titre, statut) {
+        inventaireTexteCourant = texte;
+        document.getElementById('inventaire-titre').textContent = titre || "Inventaire des dépôts";
+        document.getElementById('inventaire-statut').textContent = statut || "";
+        document.getElementById('inventaire-texte').textContent = texte;
+        const btnCopier = document.getElementById('inventaire-copier');
+        btnCopier.textContent = "Copier dans le presse-papier";
+        btnCopier.disabled = false;
+        document.getElementById('inventaire-overlay').classList.add('visible');
+    }
+
+    function fermerInventaireDepots() {
+        document.getElementById('inventaire-overlay').classList.remove('visible');
+    }
+
+    async function copierInventaireAffiche(bouton) {
+        if (!inventaireTexteCourant) return;
+        const origine = bouton ? bouton.textContent : null;
+        if (bouton) { bouton.textContent = "Copie…"; bouton.disabled = true; }
+        const ok = await copierTexte(inventaireTexteCourant);
+        if (bouton) {
+            bouton.textContent = ok ? "✅ Copié !" : "❌ Copie impossible";
+            setTimeout(() => {
+                bouton.textContent = origine || "Copier dans le presse-papier";
+                bouton.disabled = false;
+            }, 1800);
+        }
+    }
+
+    async function copierInventaireDepots(bouton) {
+        if (!config.user || !config.token) {
+            afficherMessage("Renseigne d'abord tes identifiants GitHub à l'étape 1 pour dresser l'inventaire.", "error");
+            return;
+        }
+
+        const texteOrigine = bouton ? bouton.textContent : null;
+        if (bouton) { bouton.disabled = true; bouton.textContent = "Lecture des dépôts…"; }
+
+        try {
+            const repos = await recupererTousLesDepots();
+
+            const maintenant = new Date();
+            const lignes = [];
+            lignes.push(`Inventaire des dépôts GitHub de ${config.user}`);
+            lignes.push(`${repos.length} dépôt(s) — généré le ${maintenant.toLocaleDateString('fr-FR')} à ${maintenant.toLocaleTimeString('fr-FR')}`);
+            lignes.push("");
+
+            let totalHtml = 0;
+            let totalFichiers = 0;
+            let depotsEnErreur = 0;
+
+            for (let i = 0; i < repos.length; i++) {
+                const r = repos[i];
+                if (bouton) bouton.textContent = `Analyse ${i + 1}/${repos.length} : ${r.name}…`;
+
+                const branche = r.default_branch || 'main';
+                lignes.push(`📦 ${r.name}  (branche ${branche})`);
+
+                let resultat = null;
+                try {
+                    resultat = await listerTousLesFichiers(r.name, branche);
+                } catch (error) {
+                    depotsEnErreur++;
+                    lignes.push(`   ⚠️ Contenu illisible : ${error.message}`);
+                    lignes.push("");
+                    continue;
+                }
+
+                const fichiers = resultat.fichiers;
+                const fichiersHtml = fichiers.filter(estFichierHtml);
+                const autresFichiers = fichiers.filter(f => !estFichierHtml(f));
+                totalHtml += fichiersHtml.length;
+                totalFichiers += fichiers.length;
+
+                if (fichiersHtml.length === 0) {
+                    lignes.push("   Fichiers HTML : aucun");
+                } else {
+                    lignes.push(`   Fichiers HTML (${fichiersHtml.length}) :`);
+                    fichiersHtml.forEach(f => lignes.push(`      • ${f}`));
+                }
+
+                if (autresFichiers.length === 0) {
+                    lignes.push("   Autres fichiers : aucun");
+                } else {
+                    lignes.push(`   Autres fichiers (${autresFichiers.length}) :`);
+                    autresFichiers.forEach(f => lignes.push(`      - ${f}`));
+                }
+
+                if (resultat.tronque) {
+                    lignes.push("   ⚠️ Liste tronquée par l'API GitHub (dépôt très volumineux).");
+                }
+                lignes.push("");
+            }
+
+            lignes.push("———");
+            lignes.push(`Total : ${totalFichiers} fichier(s) dont ${totalHtml} fichier(s) HTML sur ${repos.length} dépôt(s).`);
+            if (depotsEnErreur > 0) {
+                lignes.push(`${depotsEnErreur} dépôt(s) n'ont pas pu être lus (dépôt vide ou droits insuffisants).`);
+            }
+
+            const texte = lignes.join("\n");
+
+            const copieOk = await copierTexte(texte);
+
+            ouvrirFenetreInventaire(
+                texte,
+                "Inventaire des dépôts",
+                copieOk
+                    ? "✅ Déjà copié dans le presse-papier — le bouton ci-dessous permet de le recopier."
+                    : "⚠️ La copie automatique a échoué — utilise le bouton ci-dessous."
+            );
+
+            if (copieOk) {
+                afficherMessage(`Inventaire de ${repos.length} dépôt(s) copié dans le presse-papier.`, "success");
+            } else {
+                afficherMessage("Inventaire dressé, mais la copie automatique a échoué. Utilise le bouton de la fenêtre.", "error");
+            }
+        } catch (error) {
+            afficherMessage(
+                `Impossible de dresser l'inventaire des dépôts : ${error.message}\n\n` +
+                "Vérifie que ton token est valide et possède la portée repo (token classique) " +
+                "ou les permissions Metadata et Contents en lecture (token fine-grained).",
+                "error"
+            );
+        } finally {
+            if (bouton) { bouton.disabled = false; bouton.textContent = texteOrigine; }
         }
     }
 
@@ -3700,6 +3901,9 @@
     }
 
     // Initialisation au chargement de la page
+    document.getElementById('inventaire-overlay').addEventListener('click', function (e) {
+        if (e.target === this) fermerInventaireDepots();
+    });
     initTooltips();
     rafraichirCiblesUI();
     chargerListeDepots(true);
