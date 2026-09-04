@@ -57,7 +57,7 @@
       "repo": "planningprofesseurs"
     },
     {
-      "name": "anniversaires",
+      "name": "anniversaires\nApplication « Anniversaires & Fêtes » : gestion d'une liste d'anniversaires et de fêtes persistée dans data/anniversaires.json sur GitHub. Un workflow GitHub Actions quotidien exécute scripts/envoyer_rappels.py, qui envoie un rappel par mail la veille de chaque échéance, sans qu'aucun navigateur ait besoin d'être ouvert.",
       "repo": "anniversaires",
       "coche": true
     },
@@ -77,5 +77,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-09-04T08:41:04.381Z"
+  "maj": "2026-09-04T08:44:51.029Z"
 }
