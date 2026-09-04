@@ -159,7 +159,7 @@
         .drag-handle:active { cursor: grabbing; background: #d1d1d6; }
         .drag-handle.dragging { background: #0071e3; color: #fff; }
         .target-info { flex: 1; min-width: 0; word-break: break-word; }
-        .target-nom { color: #0071e3; text-decoration: none; font-weight: 600; white-space: pre-line; }
+        .target-nom { color: #0071e3; text-decoration: none; font-weight: 600; }
         .target-repo { display: block; color: #86868b; font-size: 12px; margin-top: 2px; }
         .target-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
         .btn-edit-cible {
@@ -189,9 +189,38 @@
             flex-direction: column;
             gap: 4px;
         }
+        .btn-more-cible {
+            background: #8e8e93;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-more-cible:active { background: #6d6d72; }
         .target-actions-stack .btn-edit-cible,
-        .target-actions-stack .btn-run-cible {
+        .target-actions-stack .btn-run-cible,
+        .target-actions-stack .btn-more-cible {
             width: 100%;
+        }
+        .libelle-complet {
+            font-size: 15px;
+            line-height: 1.55;
+            color: #1d1d1f;
+            background: #f5f5f7;
+            border: 1px solid #e5e5ea;
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin: 0 0 4px 0;
+            max-height: 60vh;
+            overflow: auto;
+            white-space: pre-wrap;
+            overflow-wrap: break-word;
+            -webkit-overflow-scrolling: touch;
+            user-select: text;
+            -webkit-user-select: text;
         }
         .delete-btn { flex-shrink: 0; color: #ff3b30; background: none; border: none; font-weight: bold; cursor: pointer; }
 
@@ -397,7 +426,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.23</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.24</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -610,6 +639,18 @@
             <button id="commentaires-vider" class="modal-btn modal-btn-vider" onclick="viderZoneCommentaires(this)">🗑 Vider</button>
             <button id="commentaires-coller" class="modal-btn modal-btn-copier" onclick="collerCommentairesDepuisPressePapier(this)">📋 Coller</button>
             <button id="commentaires-enregistrer" class="modal-btn modal-btn-valider" onclick="enregistrerCommentairesHtml(this)">💾 Enregistrer sur GitHub</button>
+        </div>
+    </div>
+</div>
+
+<!-- Fenêtre d'affichage du libellé complet d'une cible -->
+<div id="libelle-overlay" class="modal-overlay">
+    <div class="modal-box modal-box-large">
+        <div class="modal-titre" id="libelle-titre">Description</div>
+        <div id="libelle-sous-titre" style="font-size:13px; color:#86868b; margin-bottom:10px;"></div>
+        <div id="libelle-contenu" class="libelle-complet"></div>
+        <div class="modal-actions" style="margin-top:14px;">
+            <button class="modal-btn modal-btn-cancel" onclick="fermerLibelleComplet()">Fermer</button>
         </div>
     </div>
 </div>
@@ -1301,7 +1342,7 @@
             lien.href = repoUrl;
             lien.target = '_blank';
             lien.className = 'target-nom';
-            lien.textContent = cible.name;
+            lien.textContent = premiereLigne(cible.name);
             const repoLabel = document.createElement('span');
             repoLabel.className = 'target-repo';
             repoLabel.textContent = `Dépôt : ${cible.repo}`;
@@ -1327,6 +1368,14 @@
             btnSuppr.addEventListener('click', () => supprimerCible(index));
             const pileEditRun = document.createElement('div');
             pileEditRun.className = 'target-actions-stack';
+            if (libelleAPlusieursLignes(cible.name)) {
+                const btnMore = document.createElement('button');
+                btnMore.className = 'btn-more-cible';
+                btnMore.textContent = 'More';
+                attacherTooltip(btnMore, "Affiche en grand la totalité du libellé de cette application (le commentaire ajouté sous son nom), au lieu de la seule première ligne montrée dans la liste.");
+                btnMore.addEventListener('click', () => ouvrirLibelleComplet(cible));
+                pileEditRun.appendChild(btnMore);
+            }
             pileEditRun.appendChild(btnEdit);
             pileEditRun.appendChild(btnRun);
             actions.appendChild(pileEditRun);
@@ -2059,6 +2108,28 @@
         const t = (texte || "").toString();
         const ligne = t.split(/\r?\n/).find(l => l.trim().length);
         return (ligne || t).trim();
+    }
+
+    function libelleAPlusieursLignes(texte) {
+        const t = (texte || "").toString();
+        return t.split(/\r?\n/).filter(l => l.trim().length).length > 1;
+    }
+
+    function ouvrirLibelleComplet(cible) {
+        document.getElementById('libelle-titre').textContent = premiereLigne(cible.name);
+        document.getElementById('libelle-sous-titre').textContent = `Dépôt : ${cible.repo}`;
+        const contenu = (cible.name || "").toString()
+            .split(/\r?\n/)
+            .filter(l => l.trim().length)
+            .slice(1)
+            .join("\n\n")
+            .trim();
+        document.getElementById('libelle-contenu').textContent = contenu || (cible.name || "");
+        document.getElementById('libelle-overlay').classList.add('visible');
+    }
+
+    function fermerLibelleComplet() {
+        document.getElementById('libelle-overlay').classList.remove('visible');
     }
 
     function modifierLibelleCible(item, index) {
@@ -4382,6 +4453,10 @@
     document.getElementById('inventaire-overlay').addEventListener('click', function (e) {
         if (e.target === this) fermerInventaireDepots();
     });
+    document.getElementById('libelle-overlay').addEventListener('click', function (e) {
+        if (e.target === this) fermerLibelleComplet();
+    });
+
     document.getElementById('commentaire-cible-overlay').addEventListener('click', function (e) {
         if (e.target === this) fermerCommentaireCible();
     });
