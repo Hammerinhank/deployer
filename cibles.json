@@ -49,7 +49,7 @@
       "repo": "codehtml"
     },
     {
-      "name": "boxinternet",
+      "name": "boxinternet\nApplication « Journal » de surveillance de la box internet : lit le fichier activity.json du dépôt via l'API GitHub et présente les relevés réseau. Deux vues, le JSON brut mis en forme et un résumé d'une ligne par enregistrement (réseau OK, panne, reboot déclenché), classé du plus récent au plus ancien, avec un encadré résumant en français clair le dernier relevé.",
       "repo": "boxinternet"
     },
     {
@@ -77,5 +77,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-09-04T08:44:51.029Z"
+  "maj": "2026-09-04T08:45:02.334Z"
 }
