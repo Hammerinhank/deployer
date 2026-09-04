@@ -33,7 +33,7 @@
       "repo": "creerAlbumPhoto"
     },
     {
-      "name": "vocabulaire vietnamien",
+      "name": "vocabulaire vietnamien\n« Vocabulaire & IA » : jeu d'association de mots vietnamien/français en deux colonnes, alimenté par un fichier de vocabulaire hébergé sur GitHub. Modes de masquage progressifs, défi écriture, comptage et visualisation de la progression par section, édition et nettoyage des données, requêtes ChatGPT paramétrables. La progression est synchronisée sur GitHub (vocab-progress.json).",
       "repo": "mon-projet"
     },
     {
@@ -77,5 +77,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-09-04T08:39:57.229Z"
+  "maj": "2026-09-04T08:40:26.877Z"
 }
