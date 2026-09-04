@@ -67,7 +67,7 @@
       "coche": true
     },
     {
-      "name": "Un niveau horizontal",
+      "name": "Un niveau horizontal\nProbablement : application de niveau à bulle utilisant les capteurs d'orientation du téléphone. Elle affiche en temps réel l'inclinaison de l'appareil selon les deux axes, avec un repère visuel indiquant l'horizontalité, pour vérifier la planéité d'une surface.",
       "repo": "niveau"
     },
     {
@@ -77,5 +77,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-09-04T08:38:05.401Z"
+  "maj": "2026-09-04T08:38:38.752Z"
 }
