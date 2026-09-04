@@ -367,6 +367,8 @@
             padding: 12px;
             resize: vertical;
         }
+        .modal-btn-vider { background: #ff3b30; color: #fff; }
+        .modal-btn-vider:active { background: #d70015; }
         .modal-btn-valider { background: #5856d6; color: #fff; }
         .modal-btn-valider:active { background: #4644b8; }
         .modal-btn-copier:active { background: #28a745; }
@@ -395,7 +397,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.19</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.22</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -605,8 +607,30 @@
         <div id="commentaires-statut" style="font-size:13px; color:#86868b; margin-top:10px; white-space:pre-wrap;"></div>
         <div class="modal-actions" style="margin-top:14px; flex-wrap:wrap;">
             <button class="modal-btn modal-btn-cancel" onclick="fermerFenetreCommentaires()">Fermer</button>
+            <button id="commentaires-vider" class="modal-btn modal-btn-vider" onclick="viderZoneCommentaires(this)">🗑 Vider</button>
             <button id="commentaires-coller" class="modal-btn modal-btn-copier" onclick="collerCommentairesDepuisPressePapier(this)">📋 Coller</button>
             <button id="commentaires-enregistrer" class="modal-btn modal-btn-valider" onclick="enregistrerCommentairesHtml(this)">💾 Enregistrer sur GitHub</button>
+        </div>
+    </div>
+</div>
+
+<!-- Fenêtre du commentaire enregistré pour une cible -->
+<div id="commentaire-cible-overlay" class="modal-overlay">
+    <div class="modal-box modal-box-large">
+        <div class="modal-titre">💬 Commentaire enregistré</div>
+        <div id="commentaire-cible-info" style="font-size:13px; color:#86868b; margin-bottom:10px;"></div>
+        <div id="commentaire-cible-choix" style="display:none; margin-bottom:10px;">
+            <label style="display:block; font-size:13px; font-weight:600; margin-bottom:4px;">Fichier HTML concerné</label>
+            <select id="commentaire-cible-fichier" style="width:100%;"></select>
+        </div>
+        <div id="commentaire-cible-texte" class="inventaire-texte" style="white-space:pre-wrap;"></div>
+        <div style="font-size:12.5px; color:#86868b; margin-bottom:10px;">
+            Libellé actuel : <strong id="commentaire-cible-actuel"></strong>
+        </div>
+        <div class="modal-actions" style="margin-top:4px; flex-wrap:wrap;">
+            <button class="modal-btn modal-btn-cancel" onclick="fermerCommentaireCible()">Ne rien faire</button>
+            <button class="modal-btn modal-btn-copier" onclick="appliquerCommentaireCible('ajouter')">➕ Ajouter à la suite</button>
+            <button class="modal-btn modal-btn-valider" onclick="appliquerCommentaireCible('remplacer')">♻️ Remplacer</button>
         </div>
     </div>
 </div>
@@ -1482,7 +1506,16 @@
         '  - "commentaire" est un texte suivi, sans retour à la ligne, de trois ou quatre lignes ;',
         "  - si tu n'as pas le contenu d'un fichier, déduis-en le rôle du nom du dépôt et des",
         "    fichiers annexes, et commence le commentaire par « Probablement : » ;",
+        "  - ignore complètement les dépôts dont la ligne indique « Fichiers HTML : aucun » :",
+        "    ils ne doivent donner lieu à AUCUNE entrée dans le JSON, même vide ;",
+        "  - les trois champs \"depot\", \"fichier\" et \"commentaire\" doivent être renseignés dans",
+        "    chaque entrée : aucune entrée partielle ou avec des champs vides n'est acceptée ;",
         '  - n\'ajoute pas de champ "maj" : Le Déployeur le renseigne lui-même à l\'enregistrement.',
+        "",
+        "Avant de rendre le JSON, vérifie-le toi-même : compte tes entrées et compare ce nombre",
+        "au total de fichiers HTML annoncé sur la dernière ligne de l'inventaire (« Total : ...",
+        "dont N fichier(s) HTML »). Les deux nombres doivent être strictement égaux. Vérifie",
+        "aussi qu'aucune entrée n'a de champ vide. Corrige avant de répondre si besoin.",
         "",
         "Copie ensuite le JSON obtenu, puis enregistre-le avec le bouton « 💬 Enregistrer les",
         "commentaires HTML (JSON) » de la section 2 du Déployeur.",
@@ -1686,6 +1719,22 @@
         document.getElementById('commentaires-overlay').classList.remove('visible');
     }
 
+    async function viderZoneCommentaires(bouton) {
+        const zone = document.getElementById('commentaires-zone');
+        if (!zone.value.trim()) {
+            afficherStatutCommentaires("La zone est déjà vide.");
+            return;
+        }
+        const ok = await confirmerModal(
+            "Vider entièrement la zone de texte ? Le contenu collé sera perdu (rien n'est modifié sur GitHub).",
+            "Vider", "Annuler"
+        );
+        if (!ok) return;
+        zone.value = "";
+        afficherStatutCommentaires("Zone vidée.", "success");
+        zone.focus();
+    }
+
     async function collerCommentairesDepuisPressePapier(bouton) {
         const zone = document.getElementById('commentaires-zone');
         const origine = bouton ? bouton.textContent : null;
@@ -1742,7 +1791,20 @@
             const depot = (e.depot || e.repo || e.depôt || "").toString().trim();
             const fichier = (e.fichier || e.file || e.chemin || "").toString().trim();
             const commentaire = (e.commentaire || e.resume || e.résumé || e.description || "").toString().trim();
-            if (!depot || !fichier) throw new Error(`Entrée n°${i + 1} incomplète : « depot » et « fichier » sont obligatoires.`);
+            if (!depot || !fichier) {
+                const indices = [];
+                if (depot) indices.push(`dépôt « ${depot} »`);
+                if (fichier) indices.push(`fichier « ${fichier} »`);
+                if (!depot && !fichier && commentaire) indices.push(`commentaire commençant par « ${commentaire.slice(0, 60)}… »`);
+                const manquants = [];
+                if (!depot) manquants.push("« depot »");
+                if (!fichier) manquants.push("« fichier »");
+                const ou = indices.length ? ` (${indices.join(", ")})` : " (aucun champ exploitable : entrée entièrement vide)";
+                throw new Error(
+                    `Entrée n°${i + 1} sur ${brut.length} incomplète${ou} : ${manquants.join(" et ")} ${manquants.length > 1 ? "sont obligatoires" : "est obligatoire"}. ` +
+                    `Supprime cette entrée du JSON ou complète-la, puis recolle-le.`
+                );
+            }
             entrees.push({ depot: depot, fichier: fichier, commentaire: commentaire });
         });
 
@@ -2015,6 +2077,11 @@
         btnSave.className = 'btn-small btn-copy';
         btnSave.textContent = 'Enregistrer';
 
+        const btnComm = document.createElement('button');
+        btnComm.className = 'btn-small btn-download';
+        btnComm.textContent = '💬 Commentaire';
+        btnComm.addEventListener('click', () => ouvrirCommentairePourCible(cible, input, btnComm));
+
         const btnCancel = document.createElement('button');
         btnCancel.className = 'btn-small btn-view';
         btnCancel.textContent = 'Annuler';
@@ -2038,13 +2105,118 @@
             else if (ev.key === 'Escape') { ev.preventDefault(); btnCancel.click(); }
         });
 
+        actions.style.flexWrap = 'wrap';
         actions.appendChild(btnSave);
+        actions.appendChild(btnComm);
         actions.appendChild(btnCancel);
         item.appendChild(label);
         item.appendChild(input);
         item.appendChild(actions);
         input.focus();
         input.select();
+    }
+
+    // --- Commentaire enregistré (commentaires-html.json) pour la cible en cours d'édition ---
+    let commentaireCibleContexte = null;
+
+    async function ouvrirCommentairePourCible(cible, input, bouton) {
+        if (!config.user || !config.token) {
+            afficherMessage("Renseigne d'abord tes identifiants GitHub à l'étape 1.", "error");
+            return;
+        }
+        if (!syncConfiguree()) {
+            afficherMessage("Indique d'abord le dépôt de synchronisation (section 5) : c'est là qu'est rangé commentaires-html.json.", "error");
+            return;
+        }
+
+        const origine = bouton ? bouton.textContent : null;
+        if (bouton) { bouton.disabled = true; bouton.textContent = "Lecture…"; }
+
+        try {
+            const distant = await lireCommentairesDistants();
+            const pourCeDepot = (distant.entrees || []).filter(e =>
+                e && (e.depot || "").toString().trim().toLowerCase() === (cible.repo || "").toLowerCase()
+            );
+
+            if (!pourCeDepot.length) {
+                afficherMessage(
+                    `Aucun commentaire enregistré pour le dépôt « ${cible.repo} » dans ${NOM_FICHIER_COMMENTAIRES}.`,
+                    "error"
+                );
+                return;
+            }
+
+            commentaireCibleContexte = { input: input, entrees: pourCeDepot, repo: cible.repo };
+
+            document.getElementById('commentaire-cible-info').textContent =
+                `Dépôt « ${cible.repo} » — texte trouvé dans ${NOM_FICHIER_COMMENTAIRES}.`;
+            document.getElementById('commentaire-cible-actuel').textContent =
+                (input.value || "").trim() || "(vide)";
+
+            const blocChoix = document.getElementById('commentaire-cible-choix');
+            const selectFichier = document.getElementById('commentaire-cible-fichier');
+            selectFichier.innerHTML = "";
+            pourCeDepot.forEach((e, i) => {
+                const opt = document.createElement('option');
+                opt.value = String(i);
+                opt.textContent = (e.fichier || "(fichier inconnu)");
+                selectFichier.appendChild(opt);
+            });
+            selectFichier.value = "0";
+            blocChoix.style.display = pourCeDepot.length > 1 ? 'block' : 'none';
+            selectFichier.onchange = afficherTexteCommentaireCible;
+
+            afficherTexteCommentaireCible();
+            document.getElementById('commentaire-cible-overlay').classList.add('visible');
+        } catch (error) {
+            afficherMessage(`Lecture de ${NOM_FICHIER_COMMENTAIRES} impossible : ${error.message}`, "error");
+        } finally {
+            if (bouton) { bouton.disabled = false; bouton.textContent = origine || '💬 Commentaire'; }
+        }
+    }
+
+    function commentaireCibleSelectionne() {
+        if (!commentaireCibleContexte) return "";
+        const i = parseInt(document.getElementById('commentaire-cible-fichier').value || "0", 10);
+        const e = commentaireCibleContexte.entrees[i] || commentaireCibleContexte.entrees[0];
+        return (e && e.commentaire ? e.commentaire : "").toString().trim();
+    }
+
+    function afficherTexteCommentaireCible() {
+        const texte = commentaireCibleSelectionne();
+        document.getElementById('commentaire-cible-texte').textContent =
+            texte || "(aucun texte de commentaire pour ce fichier)";
+    }
+
+    function fermerCommentaireCible() {
+        document.getElementById('commentaire-cible-overlay').classList.remove('visible');
+        commentaireCibleContexte = null;
+    }
+
+    function appliquerCommentaireCible(mode) {
+        if (!commentaireCibleContexte) { fermerCommentaireCible(); return; }
+        const texte = commentaireCibleSelectionne();
+        if (!texte) {
+            afficherMessage("Ce commentaire est vide : rien à reprendre.", "error");
+            return;
+        }
+        const input = commentaireCibleContexte.input;
+        const actuel = (input.value || "").trim();
+
+        if (mode === 'remplacer' || !actuel) {
+            input.value = texte;
+        } else {
+            input.value = actuel + " " + texte;
+        }
+
+        fermerCommentaireCible();
+        input.focus();
+        afficherMessage(
+            mode === 'remplacer'
+                ? "Libellé remplacé par le commentaire — pense à cliquer sur « Enregistrer »."
+                : "Commentaire ajouté à la suite — pense à cliquer sur « Enregistrer ».",
+            "success"
+        );
     }
 
     function ajouterCibleAutomatique(name, repo) {
@@ -4199,6 +4371,10 @@
     document.getElementById('inventaire-overlay').addEventListener('click', function (e) {
         if (e.target === this) fermerInventaireDepots();
     });
+    document.getElementById('commentaire-cible-overlay').addEventListener('click', function (e) {
+        if (e.target === this) fermerCommentaireCible();
+    });
+
     document.getElementById('commentaires-overlay').addEventListener('click', function (e) {
         if (e.target === this) fermerFenetreCommentaires();
     });
