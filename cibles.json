@@ -9,12 +9,12 @@
       "repo": "Audio"
     },
     {
-      "name": "Tourisme\nApplication « Où suis-je ? » : géolocalise l'utilisateur et affiche l'adresse du lieu, des photos issues de Wikimedia Commons, l'article Wikipédia le plus proche et une carte Leaflet interactive. Un appui long permet de déplacer le repère pour consulter un autre endroit. L'historique des lieux consultés est synchronisé sur GitHub dans visites.json.",
-      "repo": "Tourisme"
-    },
-    {
       "name": "Parkings\nPage de géolocalisation avec carte Leaflet et OpenStreetMap servant de banc d'essai : affiche la position courante et l'adresse obtenue par géocodage inverse. Elle sert de point d'entrée au dépôt qui héberge aussi l'application de stationnement et les fichiers de trajets.",
       "repo": "test-app"
+    },
+    {
+      "name": "Tourisme\nApplication « Où suis-je ? » : géolocalise l'utilisateur et affiche l'adresse du lieu, des photos issues de Wikimedia Commons, l'article Wikipédia le plus proche et une carte Leaflet interactive. Un appui long permet de déplacer le repère pour consulter un autre endroit. L'historique des lieux consultés est synchronisé sur GitHub dans visites.json.",
+      "repo": "Tourisme"
     },
     {
       "name": "Calcul de pente\n« Pente — inclinomètre GPS » : mesure en temps réel la pente de la route en % à partir de l'altitude GPS, avec verrouillage d'une section tous les 100 m parcourus (2 km en mode Avion). Graphiques du relief et de la pente, carte du parcours, récapitulatif persistant des sections organisées en séries, calcul de pente moyenne entre deux points. Fonctionne hors ligne.",
@@ -77,5 +77,5 @@
     }
   ],
   "derniereCible": "restaurants",
-  "maj": "2026-09-04T20:49:26.460Z"
+  "maj": "2026-09-04T20:49:27.384Z"
 }
