@@ -5,7 +5,7 @@
       "repo": "deployer"
     },
     {
-      "name": "Tourisme",
+      "name": "Tourisme\nApplication « Où suis-je ? » : géolocalise l'utilisateur et affiche l'adresse du lieu, des photos issues de Wikimedia Commons, l'article Wikipédia le plus proche et une carte Leaflet interactive. Un appui long permet de déplacer le repère pour consulter un autre endroit. L'historique des lieux consultés est synchronisé sur GitHub dans visites.json.",
       "repo": "Tourisme"
     },
     {
@@ -77,5 +77,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-09-04T08:18:44.757Z"
+  "maj": "2026-09-04T08:19:30.967Z"
 }
