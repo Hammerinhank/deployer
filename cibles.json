@@ -74,8 +74,12 @@
       "name": "La cave à vins\nApplication « Cave à Vin » : gestion complète de la cave, avec ajout et retrait de bouteilles, quantités par emplacement, photos d'étiquettes, notes et commentaires de dégustation, fenêtre d'apogée et statistiques. Tri, regroupement, recherche, listes exportables et identification d'un vin par photo via ChatGPT ou Claude. Tout est persisté localement et synchronisé sur GitHub (cave.json, images, réglages, journal).",
       "repo": "vins",
       "coche": true
+    },
+    {
+      "name": "CaaaG",
+      "repo": "CaaaG"
     }
   ],
   "derniereCible": "restaurants",
-  "maj": "2026-09-04T20:49:46.228Z"
+  "maj": "2026-09-04T20:50:26.583Z"
 }
