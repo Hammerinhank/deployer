@@ -448,7 +448,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.26</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.27</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -4483,8 +4483,38 @@
     const TITRE_PROBLEME = "② Comment résoudre le problème";
     const TITRE_SUITE = "② Ce qu'il faut retenir / faire ensuite";
 
+    function estFichierWorkflow(chemin) {
+        return /^\.github\/workflows\//i.test(String(chemin || ""));
+    }
+
     function diagnostiquerErreurFichier(statusCode, message, chemin, repo, branche) {
         const m = (message || "").toLowerCase();
+
+        if ((statusCode === 403 || statusCode === 422) &&
+            (estFichierWorkflow(chemin) || m.includes("workflow"))) {
+            return "Cause : ce fichier est un workflow GitHub Actions (il est rangé dans " +
+                "« .github/workflows/ »). GitHub protège spécialement ces fichiers-là : un token " +
+                "qui a le droit d'écrire dans le dépôt — et qui déploie donc très bien index.html " +
+                "ou n'importe quel autre fichier — reste refusé sur « " + chemin + " » tant qu'il " +
+                "n'a pas EN PLUS l'autorisation dédiée aux workflows. C'est une protection contre " +
+                "un token volé qui ferait exécuter du code sur les serveurs de GitHub. Rien n'a " +
+                "été modifié.\n\n" +
+                "➡️ Marche à suivre selon le type de token :\n" +
+                "• Token CLASSIQUE (ghp_…) : il lui manque la portée « workflow ». Ouvre " +
+                "https://github.com/settings/tokens, clique sur le token utilisé ici, coche la case " +
+                "« workflow » (juste sous le bloc « repo »), puis « Update token ». La case « repo » " +
+                "seule ne suffit pas.\n" +
+                "• Token FINE-GRAINED (github_pat_…) : il lui manque la permission « Workflows ». " +
+                "Ouvre https://github.com/settings/tokens?type=beta, clique sur le token, section " +
+                "« Repository permissions », règle « Workflows » sur « Read and write » (en plus de " +
+                "« Contents : Read and write »), et vérifie que « " + repo + " » fait bien partie " +
+                "des dépôts autorisés. Puis « Update ».\n" +
+                "Dans les deux cas la correction est immédiate, sans avoir à régénérer le token ni " +
+                "à le recoller ici : reviens sur cette page et reclique « Mettre à jour sur GitHub ».\n\n" +
+                "Solution de repli si tu préfères ne pas élargir les droits du token : édite ce " +
+                "fichier directement sur github.com (le site web, lui, a le droit), ou colle ton " +
+                "contenu dans « ✏️ Edit » pour le copier avant de le coller là-bas.";
+        }
 
         if (statusCode === 401 || m.includes("bad credentials")) {
             return "Cause : GitHub a refusé ton token (invalide, révoqué ou expiré). Rien n'a été écrit " +
@@ -4642,6 +4672,14 @@
         }
 
         journal.majEtape(iControles, "Contrôles préalables : identifiants, contenu et commentaire OK.", "ok");
+
+        if (estFichierWorkflow(chemin)) {
+            journal.etape(
+                "Fichier de workflow GitHub Actions : GitHub exige pour celui-ci une autorisation " +
+                "supplémentaire du token (portée « workflow » sur un token classique, permission " +
+                "« Workflows : Read and write » sur un token fine-grained), en plus du droit d'écriture habituel.",
+                "info");
+        }
 
         bouton.disabled = true;
         const origineBouton = bouton.textContent;
