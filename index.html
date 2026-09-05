@@ -462,7 +462,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.31</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.32</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -1471,6 +1471,7 @@
             synchroniserSelects('deploiement');
             memoriserCibleChoisie(e.target.value);
             mettreAJourBoutonAutresFichiers();
+            viderHistoriqueSurChangementCible();
         });
     document.getElementById('select-history-target')
         .addEventListener('change', (e) => {
@@ -1478,6 +1479,7 @@
             memoriserCibleChoisie(e.target.value);
             mettreAJourBoutonAutresFichiers();
             afficherLigneUrlAppli(null);
+            viderHistoriqueSurChangementCible();
         });
 
     async function recupererTousLesDepots() {
@@ -3183,16 +3185,28 @@
         return !!listDiv && listDiv.innerHTML.trim() !== "";
     }
 
-    function viderHistorique() {
+    function viderHistorique(message) {
         const listDiv = document.getElementById('history-list');
         if (!listDiv) return;
         // on supprime les éléments plutôt que de les masquer : le prochain clic
         // repartira d'un historique entièrement rechargé
         while (listDiv.firstChild) listDiv.removeChild(listDiv.firstChild);
         afficherMessage(
-            "Historique effacé de l'écran.\n\n" +
-            "Reclique sur « Charger l'historique » pour le recharger depuis GitHub.",
+            message || (
+                "Historique effacé de l'écran.\n\n" +
+                "Reclique sur « Charger l'historique » pour le recharger depuis GitHub."
+            ),
             "success"
+        );
+    }
+
+    // Appelé quand on change d'application dans l'une des deux listes :
+    // l'historique affiché concerne l'application précédente, il doit disparaître.
+    function viderHistoriqueSurChangementCible() {
+        if (!historiqueEstAffiche()) return;
+        viderHistorique(
+            "Historique effacé : il concernait l'application précédemment sélectionnée.\n\n" +
+            "Clique sur « Charger l'historique » pour afficher celui de la nouvelle application."
         );
     }
 
