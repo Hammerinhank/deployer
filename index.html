@@ -443,12 +443,26 @@
         .tooltip-detaille.visible { opacity: 1; transform: translateY(0); }
         .tooltip-detaille.tooltip-bas { transform: translateY(-4px); }
         .tooltip-detaille.tooltip-bas.visible { transform: translateY(0); }
+
+        /* ---- Surveillance de la publication GitHub Pages (v1.28) ----
+           Double liseré autour du bouton « Charger l'historique » :
+           rouge 1 s à chaque test infructueux, vert 5 s quand la page est prête. */
+        #btn-history.pages-attente {
+            outline: 3px solid #ff3b30;
+            outline-offset: 3px;
+            box-shadow: 0 0 0 3px #ff3b30 inset, 0 0 12px rgba(255,59,48,0.7);
+        }
+        #btn-history.pages-prete {
+            outline: 3px solid #34c759;
+            outline-offset: 3px;
+            box-shadow: 0 0 0 3px #34c759 inset, 0 0 16px rgba(52,199,89,0.8);
+        }
     </style>
 </head>
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.27</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.28</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -2959,6 +2973,9 @@
 
             afficherMessage(`Commit ${shaCommit} créé. Vérification du contenu réellement en ligne...`, "success");
 
+            // Surveillance de la publication GitHub Pages, en parallèle de la vérification
+            surveillerPublicationPages(repo, code);
+
             const verif = await verifierContenuEnLigne(url, code, shaCommitComplet, (n, total) => {
                 afficherMessage(
                     `Commit ${shaCommit} créé. GitHub n'a pas encore propagé le fichier — ` +
@@ -3048,6 +3065,104 @@
         }
 
         return item;
+    }
+
+    // =====================================================================
+    //  Surveillance de la publication GitHub Pages (v1.28)
+    //  Après un déploiement, teste toutes les 5 s si l'URL publique sert
+    //  bien le NOUVEAU contenu. Tant que non : double liseré rouge 1 s
+    //  autour du bouton « Charger l'historique ». Dès que oui : double
+    //  liseré vert pendant 5 s, puis arrêt.
+    // =====================================================================
+
+    const PAGES_INTERVALLE_MS = 5000;   // un test toutes les 5 secondes
+    const PAGES_ROUGE_MS = 1000;        // durée du liseré rouge
+    const PAGES_VERT_MS = 5000;         // durée du liseré vert
+    const PAGES_MAX_TENTATIVES = 120;   // abandon au bout de 10 minutes
+    let pagesSurveillanceEnCours = null;
+
+    function arreterSurveillancePages() {
+        if (pagesSurveillanceEnCours) {
+            clearTimeout(pagesSurveillanceEnCours.minuteur);
+            pagesSurveillanceEnCours = null;
+        }
+        const bouton = document.getElementById('btn-history');
+        if (bouton) bouton.classList.remove('pages-attente', 'pages-prete');
+    }
+
+    function clignoterBouton(classe, duree) {
+        const bouton = document.getElementById('btn-history');
+        if (!bouton) return;
+        bouton.classList.remove('pages-attente', 'pages-prete');
+        // reflow, pour que la classe se réapplique même si elle vient d'être retirée
+        void bouton.offsetWidth;
+        bouton.classList.add(classe);
+        setTimeout(() => bouton.classList.remove(classe), duree);
+    }
+
+    // Le contenu servi par Pages correspond-il à ce qui vient d'être déployé ?
+    function contenuCorrespond(recu, attendu) {
+        const normaliser = t => (t || "").replace(/\r/g, "").trim();
+        return normaliser(recu) === normaliser(attendu);
+    }
+
+    async function surveillerPublicationPages(repo, codeDeploye) {
+        arreterSurveillancePages();
+        if (!repo) return;
+
+        const urlPublique = `https://hammerinhank.github.io/${repo}/`;
+        const etat = { tentatives: 0, minuteur: null };
+        pagesSurveillanceEnCours = etat;
+
+        async function tester() {
+            if (pagesSurveillanceEnCours !== etat) return;   // une autre surveillance a pris le relais
+            etat.tentatives++;
+
+            let prete = false;
+            try {
+                const res = await fetch(`${urlPublique}?_=${Date.now()}`, { cache: 'no-store' });
+                if (res.ok) {
+                    const texte = await res.text();
+                    prete = contenuCorrespond(texte, codeDeploye);
+                }
+            } catch (e) {
+                prete = false;   // page pas encore publiée, ou lecture impossible depuis cette origine
+            }
+
+            if (pagesSurveillanceEnCours !== etat) return;
+
+            if (prete) {
+                clignoterBouton('pages-prete', PAGES_VERT_MS);
+                pagesSurveillanceEnCours = null;
+                afficherMessage(
+                    "🟢 PAGE EN LIGNE\n\n" +
+                    `${urlPublique} sert désormais la version que tu viens de déployer ` +
+                    `(vérifié au bout de ${etat.tentatives * 5} secondes).\n\n` +
+                    "L'application est prête à être ouverte.",
+                    "success"
+                );
+                return;
+            }
+
+            clignoterBouton('pages-attente', PAGES_ROUGE_MS);
+
+            if (etat.tentatives >= PAGES_MAX_TENTATIVES) {
+                pagesSurveillanceEnCours = null;
+                afficherMessage(
+                    "⏱️ PUBLICATION ANORMALEMENT LONGUE\n\n" +
+                    `Au bout de 10 minutes, ${urlPublique} ne sert toujours pas le contenu déployé.\n\n` +
+                    "Le commit est bien créé — c'est la publication GitHub Pages qui coince. " +
+                    "Regarde l'onglet Actions du dépôt : le déploiement Pages y échoue peut-être. " +
+                    "Vérifie aussi que Pages est activé sur la bonne branche dans Settings → Pages.",
+                    "error"
+                );
+                return;
+            }
+
+            etat.minuteur = setTimeout(tester, PAGES_INTERVALLE_MS);
+        }
+
+        tester();
     }
 
     async function chargerHistorique() {
