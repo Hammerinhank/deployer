@@ -78,8 +78,12 @@
     {
       "name": "CaaaG\nProbablement : page d'affichage embarquée du site CaaaG (application Node/Express), destinée à être incluse dans un cadre par l'interface principale. Elle sert à présenter le document ou le contenu converti (docx/xml vers HTML) dans une zone isolée du reste de l'interface.\nProbablement : interface principale de l'application web CaaaG, hébergée en Node/Express et déployée via GitHub Actions sur Azure. Elle regroupe la conversion de documents Word en HTML, l'exploration arborescente des fichiers, la recherche par thèmes et règles, ainsi que les outils annexes (scanner, worker, décompression 7-Zip).\nProbablement : page « temps réel » de l'application CaaaG, associée au script realtime.js. Elle affiche en direct l'avancement des traitements lancés côté serveur (conversion, analyse, scan de fichiers) et les messages émis pendant leur exécution.\nProbablement : page « temps réel » de l'application CaaaG, associée au script realtime.js. Elle affiche en direct l'avancement des traitements lancés côté serveur (conversion, analyse, scan de fichiers) et les messages émis pendant leur exécution.",
       "repo": "CaaaG"
+    },
+    {
+      "name": "tokens",
+      "repo": "tokens"
     }
   ],
   "derniereCible": "boxinternet",
-  "maj": "2026-09-05T09:12:58.967Z"
+  "maj": "2026-09-05T10:19:30.261Z"
 }
