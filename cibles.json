@@ -46,7 +46,8 @@
     },
     {
       "name": "Pour manipuler du code html\nApplication « Éditeur & Prévisualisation HTML » organisée en trois zones repliables : préparation d'une requête pour ChatGPT, pipeline de mise en forme du texte obtenu, puis éditeur HTML avec aperçu. Elle propose la colorisation « Aérer Sections », l'enrobage des hyperliens et le nettoyage de conversation. Le contenu est persisté sur GitHub dans data.json.",
-      "repo": "codehtml"
+      "repo": "codehtml",
+      "coche": true
     },
     {
       "name": "boxinternet\nApplication « Journal » de surveillance de la box internet : lit le fichier activity.json du dépôt via l'API GitHub et présente les relevés réseau. Deux vues, le JSON brut mis en forme et un résumé d'une ligne par enregistrement (réseau OK, panne, reboot déclenché), classé du plus récent au plus ancien, avec un encadré résumant en français clair le dernier relevé.",
@@ -86,5 +87,5 @@
     }
   ],
   "derniereCible": "codehtml",
-  "maj": "2026-09-05T13:58:41.063Z"
+  "maj": "2026-09-05T13:59:55.337Z"
 }
