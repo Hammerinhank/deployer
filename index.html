@@ -462,7 +462,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.30</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.31</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -3107,10 +3107,11 @@
         return normaliser(recu) === normaliser(attendu);
     }
 
-    async function surveillerPublicationPages(repo, codeDeploye) {
+    async function surveillerPublicationPages(repo, codeDeploye, libelleVersion) {
         arreterSurveillancePages();
         if (!repo) return;
 
+        const description = libelleVersion || "la version qui vient d'être commitée";
         const urlPublique = `https://hammerinhank.github.io/${repo}/`;
         const etat = { tentatives: 0, minuteur: null, debut: Date.now() };
         pagesSurveillanceEnCours = etat;
@@ -3144,7 +3145,7 @@
                     const secondes = Math.round(attenteMs / 1000);
                     afficherMessage(
                         "🟢 URL ENFIN DISPONIBLE\n\n" +
-                        `${urlPublique} sert maintenant la version qui vient d'être commitée.\n\n` +
+                        `${urlPublique} sert maintenant ${description}.\n\n` +
                         `GitHub Pages a mis ${secondes} secondes à la publier ` +
                         `(${etat.tentatives} vérifications). L'application est prête à être ouverte.`,
                         "success"
@@ -3692,6 +3693,10 @@
             }
 
             afficherMessage(`Commit ${shaCommit} créé. Vérification de la version restaurée en ligne...`, "success");
+
+            // Même surveillance que pour un déploiement : on saura quand l'URL
+            // publique servira réellement la version restaurée.
+            surveillerPublicationPages(repo, ancienContenu, `la version du ${dateStr} que tu viens de restaurer`);
             const verif = await verifierContenuEnLigne(urlActuel, ancienContenu, shaCommitComplet, (n, total) => {
                 afficherMessage(
                     `Commit ${shaCommit} créé. GitHub n'a pas encore propagé le fichier — ` +
