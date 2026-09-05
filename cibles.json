@@ -84,8 +84,12 @@
     {
       "name": "tokens\nChanger mes tokens (tokens.html) — outil de rotation des tokens GitHub. Analyse le localStorage du domaine, repère toutes les valeurs ayant la forme d'un token (y compris à l'intérieur des objets JSON de configuration), les regroupe par valeur, et remplace le token dans toutes les entrées cochées d'un seul geste. Sauvegarde téléchargeable et restauration avant modification, vérification du nouveau token auprès de l'API GitHub, inventaire complet des clés en diagnostic.",
       "repo": "tokens"
+    },
+    {
+      "name": "Check de mots VN",
+      "repo": "checkwordsvn"
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-09-05T16:06:57.593Z"
+  "maj": "2026-09-05T16:59:57.036Z"
 }
