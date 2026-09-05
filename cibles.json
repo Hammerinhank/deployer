@@ -80,10 +80,10 @@
       "repo": "CaaaG"
     },
     {
-      "name": "tokens",
+      "name": "tokens\nChanger mes tokens (tokens.html) — outil de rotation des tokens GitHub. Analyse le localStorage du domaine, repère toutes les valeurs ayant la forme d'un token (y compris à l'intérieur des objets JSON de configuration), les regroupe par valeur, et remplace le token dans toutes les entrées cochées d'un seul geste. Sauvegarde téléchargeable et restauration avant modification, vérification du nouveau token auprès de l'API GitHub, inventaire complet des clés en diagnostic.",
       "repo": "tokens"
     }
   ],
   "derniereCible": "tokens",
-  "maj": "2026-09-05T10:19:47.952Z"
+  "maj": "2026-09-05T10:21:50.496Z"
 }
