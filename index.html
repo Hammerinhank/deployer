@@ -445,24 +445,24 @@
         .tooltip-detaille.tooltip-bas.visible { transform: translateY(0); }
 
         /* ---- Surveillance de la publication GitHub Pages (v1.28) ----
-           Double liseré autour du bouton « Charger l'historique » :
+           Double liseré autour du bouton « Copier l'URL de l'appli » :
            rouge 1 s à chaque test infructueux, vert 5 s quand la page est prête. */
-        #btn-history.pages-attente {
+        #btn-copier-url.pages-attente {
             outline: 3px solid #ff3b30;
             outline-offset: 3px;
-            box-shadow: 0 0 0 3px #ff3b30 inset, 0 0 12px rgba(255,59,48,0.7);
+            box-shadow: 0 0 0 3px #ffffff inset, 0 0 14px rgba(255,59,48,0.85);
         }
-        #btn-history.pages-prete {
-            outline: 3px solid #34c759;
+        #btn-copier-url.pages-prete {
+            outline: 3px solid #0a7d34;
             outline-offset: 3px;
-            box-shadow: 0 0 0 3px #34c759 inset, 0 0 16px rgba(52,199,89,0.8);
+            box-shadow: 0 0 0 3px #ffffff inset, 0 0 18px rgba(52,199,89,0.95);
         }
     </style>
 </head>
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.32</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.33</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -565,7 +565,7 @@
         <label for="select-history-target">Application concernée</label>
         <select id="select-history-target"></select>
 
-        <button class="btn" onclick="copierUrlAppli(this)" style="background-color: #34c759;" data-tip="Calcule l'adresse GitHub Pages de l'application sélectionnée (du type https://tonpseudo.github.io/depot/), la copie dans le presse-papier, et l'affiche juste en dessous sous forme de lien cliquable pour vérifier tout de suite qu'elle fonctionne bien.">🔗 Copier l'URL de l'appli</button>
+        <button class="btn" id="btn-copier-url" onclick="copierUrlAppli(this)" style="background-color: #34c759;" data-tip="Calcule l'adresse GitHub Pages de l'application sélectionnée (du type https://tonpseudo.github.io/depot/), la copie dans le presse-papier, et l'affiche juste en dessous sous forme de lien cliquable pour vérifier tout de suite qu'elle fonctionne bien. Après un déploiement ou une restauration, ce bouton s'entoure d'un double liseré rouge tant que GitHub Pages n'a pas publié la nouvelle version, puis d'un double liseré vert dès que l'URL sert le bon contenu.">🔗 Copier l'URL de l'appli</button>
         <div id="url-appli-ligne"></div>
         <button class="btn" id="btn-history" style="background-color: #ff9500; margin-top: 10px; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;" data-tip="Récupère la liste des commits (versions successives) du fichier index.html de l'application sélectionnée, avec leur date et leur commentaire de version, pour pouvoir ensuite consulter, copier, télécharger ou restaurer une ancienne version ci-dessous. Un nouveau clic pendant que l'historique est affiché l'efface complètement de l'écran ; le clic suivant le recharge depuis GitHub. Reste appuyé plus de 5 secondes pour charger tout l'historique en continu (le bouton devient rouge) ; un simple appui dessus pendant qu'il est rouge arrête le chargement.">Charger l'historique</button>
 
@@ -3073,7 +3073,7 @@
     //  Surveillance de la publication GitHub Pages (v1.28)
     //  Après un déploiement, teste toutes les 5 s si l'URL publique sert
     //  bien le NOUVEAU contenu. Tant que non : double liseré rouge 1 s
-    //  autour du bouton « Charger l'historique ». Dès que oui : double
+    //  autour du bouton « Copier l'URL de l'appli ». Dès que oui : double
     //  liseré vert pendant 5 s, puis arrêt.
     // =====================================================================
 
@@ -3089,12 +3089,12 @@
             clearTimeout(pagesSurveillanceEnCours.minuteur);
             pagesSurveillanceEnCours = null;
         }
-        const bouton = document.getElementById('btn-history');
+        const bouton = document.getElementById('btn-copier-url');
         if (bouton) bouton.classList.remove('pages-attente', 'pages-prete');
     }
 
     function clignoterBouton(classe, duree) {
-        const bouton = document.getElementById('btn-history');
+        const bouton = document.getElementById('btn-copier-url');
         if (!bouton) return;
         bouton.classList.remove('pages-attente', 'pages-prete');
         // reflow, pour que la classe se réapplique même si elle vient d'être retirée
