@@ -1,7 +1,7 @@
 {
   "cibles": [
     {
-      "name": "Cette appli (de déploiement)\n« Le Déployeur d'Apps » : outil central de gestion des dépôts GitHub et des applications publiées sur GitHub Pages. Il enregistre les identifiants et la liste des cibles (cibles.json), pousse un nouveau code HTML vers le dépôt choisi avec vérification après déploiement, gère l'historique des commits et la restauration de versions, l'édition des autres fichiers, la création de dépôts et un scan de sécurité des jetons.",
+      "name": "A - Cette appli (de déploiement)\n« Le Déployeur d'Apps » : outil central de gestion des dépôts GitHub et des applications publiées sur GitHub Pages. Il enregistre les identifiants et la liste des cibles (cibles.json), pousse un nouveau code HTML vers le dépôt choisi avec vérification après déploiement, gère l'historique des commits et la restauration de versions, l'édition des autres fichiers, la création de dépôts et un scan de sécurité des jetons.",
       "repo": "deployer"
     },
     {
@@ -91,5 +91,5 @@
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-09-07T07:16:36.983Z"
+  "maj": "2026-09-07T07:17:40.694Z"
 }
