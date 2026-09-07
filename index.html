@@ -462,7 +462,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.35</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.36</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -1479,6 +1479,7 @@
             synchroniserSelects('deploiement');
             memoriserCibleChoisie(e.target.value);
             mettreAJourBoutonAutresFichiers();
+            afficherLigneUrlAppli(null);
             viderHistoriqueSurChangementCible();
         });
     document.getElementById('select-history-target')
