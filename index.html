@@ -462,7 +462,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.33</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.35</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -1431,6 +1431,14 @@
                 opt.textContent = premiereLigne(cible.name);
                 s.appendChild(opt);
             });
+        });
+
+        // Les deux listes déroulantes sont présentées par ordre alphabétique,
+        // indépendamment de l'ordre de la liste des cibles (réordonnable à la main).
+        [select, selectHistory].forEach(s => {
+            Array.from(s.options)
+                .sort((a, b) => a.textContent.localeCompare(b.textContent, 'fr', { sensitivity: 'base' }))
+                .forEach(opt => s.appendChild(opt));
         });
 
         if (derniereCibleChoisie && cibles.some(c => c.repo === derniereCibleChoisie)) {
@@ -2972,6 +2980,10 @@
                 );
                 return;
             }
+
+            // Le commit existe : l'historique affiché est désormais périmé, on le
+            // retire exactement comme un second clic sur « Charger l'historique ».
+            if (historiqueEstAffiche()) viderHistorique();
 
             afficherMessage(`Commit ${shaCommit} créé. Vérification du contenu réellement en ligne...`, "success");
 
