@@ -91,9 +91,10 @@
     },
     {
       "name": "Caméras",
-      "repo": "cameras"
+      "repo": "cameras",
+      "coche": true
     }
   ],
   "derniereCible": "checkwordsvn",
-  "maj": "2026-09-09T07:14:54.887Z"
+  "maj": "2026-09-09T07:15:00.078Z"
 }
