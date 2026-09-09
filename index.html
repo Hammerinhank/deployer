@@ -78,6 +78,21 @@
             border: 2px dashed #5856d6;
             background: #f0f0ff;
         }
+        /* Zone de glisser-déposer du bloc « Ajouter un fichier » (v1.37) */
+        #zone-depot-nouveau-fichier {
+            margin-top: 10px;
+            padding: 14px;
+            border: 2px dashed #34c759;
+            border-radius: 8px;
+            background: #ffffff;
+            color: #86868b;
+            font-size: 13px;
+            text-align: center;
+        }
+        #zone-depot-nouveau-fichier.zone-depot-actif {
+            background: #e8f9ed;
+            color: #1d1d1f;
+        }
         /* Grande zone d'édition plein écran (section 7) */
         #edition-textarea {
             height: 60vh;
@@ -462,7 +477,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.36</span></h1>
+    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.37</span></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -625,8 +640,32 @@
             confortable à éditer sur iPhone. Reste appuyé plus de 5 secondes sur « Charger
             l'historique » pour charger tout l'historique en continu (le bouton devient rouge) ;
             un simple appui dessus pendant qu'il est rouge arrête le chargement.
+            Le bouton vert « ➕ Ajouter un fichier au dépôt » permet d'ajouter à ce dépôt un fichier
+            qui n'y existe pas encore (script Python, workflow, fichier de données) : il crée une
+            carte vide, et le fichier est réellement créé sur GitHub au premier envoi.
         </p>
         <button class="btn" id="btn-dupliquer-commentaire" onclick="dupliquerCommentaireHtml()" style="background-color: #ff9500;" data-tip="Va chercher le commentaire du dernier commit fait sur le fichier index.html de ce dépôt, et remplit avec ce texte tous les champs « Commentaire de version » de cette page. Pratique quand tu déploies plusieurs fichiers en même temps que le HTML avec le même commentaire — chaque champ reste ensuite modifiable individuellement si besoin.">📋 Dupliquer commentaire de l'HTML</button>
+        <button class="btn" id="btn-nouveau-fichier" onclick="basculerBlocNouveauFichier()" style="background-color: #34c759; margin-top: 10px;" data-tip="Ouvre un petit formulaire pour ajouter à ce dépôt un fichier qui n'y existe pas encore (un script Python, un workflow GitHub Actions, un fichier de données…). Rien n'est écrit sur GitHub à ce moment-là : une carte vide est simplement ajoutée en tête de liste. Le fichier n'est réellement créé qu'au premier clic sur « Mettre à jour sur GitHub » de cette carte.">➕ Ajouter un fichier au dépôt</button>
+
+        <div id="bloc-nouveau-fichier" style="display:none; margin-top:10px; padding:14px; border:1px solid #34c759; border-radius:10px; background:#f4fdf6;">
+            <div style="font-size:13px; color:#86868b; margin-bottom:10px;">
+                Chemin du fichier à créer, à partir de la racine du dépôt — par exemple
+                <code>envoyer_rappels.py</code>, <code>outils/utils.py</code> ou
+                <code>.github/workflows/rappels.yml</code>. Les dossiers manquants sont créés
+                automatiquement par GitHub. Rien n'est envoyé maintenant : une carte vide est
+                ajoutée en tête de liste, et le fichier n'existera sur GitHub qu'après le premier
+                « Mettre à jour sur GitHub ».
+            </div>
+            <input type="text" id="input-nouveau-fichier" placeholder="ex. envoyer_rappels.py"
+                   autocapitalize="off" autocorrect="off" spellcheck="false">
+            <div id="zone-depot-nouveau-fichier">
+                …ou glisse-dépose ici un fichier depuis l'iMac :<br>
+                son nom remplira le champ ci-dessus et son contenu la nouvelle carte.
+            </div>
+            <button class="btn" id="btn-creer-carte-fichier" onclick="creerCarteNouveauFichier()" style="background-color: #34c759; margin-top: 10px;" data-tip="Ajoute en tête de liste une carte vide pour ce chemin. Aucun appel à GitHub n'est fait : la carte fonctionne exactement comme les autres, et c'est le bouton « Mettre à jour sur GitHub » de cette carte qui créera réellement le fichier dans le dépôt.">Créer la carte</button>
+            <div id="statut-nouveau-fichier" class="status" style="margin-top:10px;"></div>
+        </div>
+
         <div id="autres-fichiers-contenu" style="margin-top: 15px;"></div>
     </div>
 </div>
@@ -1130,13 +1169,14 @@
             throw new Error(detail);
         }
         const data = await rep.json();
-        if (!Array.isArray(data.tree)) return { fichiers: [], tronque: false };
-        const fichiers = data.tree
-            .filter(f => f.type === 'blob'
-                && !f.path.toLowerCase().endsWith('.html')
-                && !f.path.toLowerCase().endsWith('.htm'))
+        if (!Array.isArray(data.tree)) return { fichiers: [], tous: [], tronque: false };
+        const tous = data.tree
+            .filter(f => f.type === 'blob')
             .map(f => f.path);
-        return { fichiers, tronque: !!data.truncated };
+        const fichiers = tous.filter(p => !estFichierHtml(p));
+        // « tous » sert au contrôle des doublons lors de l'ajout d'un nouveau
+        // fichier (v1.37) : il inclut aussi les HTML, absents de « fichiers ».
+        return { fichiers, tous, tronque: !!data.truncated };
     }
 
     async function recupererCommitsFichier(repo, chemin, limite, page) {
@@ -3863,9 +3903,28 @@
 
     // ————— Section 6 : mise à jour des fichiers autres que le HTML —————
 
+    // Contexte de la page « autres fichiers », utilisé par le bloc
+    // « ➕ Ajouter un fichier au dépôt » (v1.37).
+    let autresFichiersRepo = null;
+    let autresFichiersBranche = 'main';
+    let autresFichiersChemins = [];      // tous les chemins déjà présents dans le dépôt
+    let contenuFichierDepose = null;     // contenu du fichier glissé-déposé, en attente
+
     function fermerPageAutresFichiers() {
         document.getElementById('page-autres-fichiers').style.display = 'none';
         document.getElementById('page-principale').style.display = 'block';
+    }
+
+    function reinitialiserBlocNouveauFichier() {
+        const bloc = document.getElementById('bloc-nouveau-fichier');
+        if (bloc) bloc.style.display = 'none';
+        const input = document.getElementById('input-nouveau-fichier');
+        if (input) input.value = '';
+        const statut = document.getElementById('statut-nouveau-fichier');
+        if (statut) { statut.style.display = 'none'; statut.textContent = ''; }
+        const zone = document.getElementById('zone-depot-nouveau-fichier');
+        if (zone) zone.classList.remove('zone-depot-actif');
+        contenuFichierDepose = null;
     }
 
     async function ouvrirPageAutresFichiers() {
@@ -3878,6 +3937,11 @@
         const pagePlein = document.getElementById('page-autres-fichiers');
         pagePlein.style.display = 'block';
         window.scrollTo(0, 0);
+
+        autresFichiersRepo = cible.repo;
+        autresFichiersBranche = 'main';
+        autresFichiersChemins = [];
+        reinitialiserBlocNouveauFichier();
 
         const zone = document.getElementById('autres-fichiers-contenu');
         zone.innerHTML = "<p style='color:#86868b; font-size:14px;'>Chargement des fichiers…</p>";
@@ -3897,10 +3961,12 @@
             const rr = await fetch(`https://api.github.com/repos/${config.user}/${cible.repo}`, { headers: headersGitHub(), cache: "no-store" });
             if (rr.ok) { const dd = await rr.json(); branche = dd.default_branch || 'main'; }
         } catch (_) {}
+        autresFichiersBranche = branche;
 
         try {
             const resultatArbre = await listerFichiersHorsHtml(cible.repo, branche);
             const fichiers = resultatArbre.fichiers;
+            autresFichiersChemins = (resultatArbre.tous || fichiers).slice();
 
             if (resultatArbre.tronque) {
                 const avert = document.createElement('p');
@@ -3927,6 +3993,201 @@
         }
 
         zone.appendChild(blocRepo);
+    }
+
+    // ————— v1.37 : ajout d'un fichier qui n'existe pas encore dans le dépôt —————
+
+    function afficherStatutNouveauFichier(texte, type) {
+        const statut = document.getElementById('statut-nouveau-fichier');
+        if (!statut) return;
+        statut.style.display = 'block';
+        statut.className = 'status ' + type;
+        statut.textContent = texte;
+    }
+
+    function basculerBlocNouveauFichier() {
+        const bloc = document.getElementById('bloc-nouveau-fichier');
+        if (!bloc) return;
+        const ouvert = bloc.style.display !== 'none';
+        if (ouvert) {
+            reinitialiserBlocNouveauFichier();
+            return;
+        }
+        bloc.style.display = 'block';
+        const input = document.getElementById('input-nouveau-fichier');
+        if (input) input.focus();
+    }
+
+    // Contrôles de forme du chemin saisi. Renvoie un message d'erreur, ou null si tout va bien.
+    function erreurCheminNouveauFichier(chemin) {
+        if (!chemin) return "Indique le chemin du fichier à créer (par exemple « envoyer_rappels.py »).";
+        if (chemin.includes('\\')) return "Utilise des barres obliques normales « / » pour séparer les dossiers, pas des antislashs.";
+        if (chemin.endsWith('/')) return "Le chemin doit se terminer par un nom de fichier, pas par un dossier.";
+        if (chemin.split('/').some(seg => seg === '' || seg === '.' || seg === '..')) {
+            return "Chemin invalide : pas de segment vide, ni « . », ni « .. ». Le chemin part de la racine du dépôt.";
+        }
+        if (/[:*?"<>|]/.test(chemin)) return "Le nom du fichier contient un caractère interdit ( : * ? \" < > | ).";
+        if (chemin.length > 255) return "Ce chemin est trop long.";
+        return null;
+    }
+
+    async function creerCarteNouveauFichier() {
+        const input = document.getElementById('input-nouveau-fichier');
+        if (!input) return;
+
+        const chemin = (input.value || '').trim().replace(/^\/+/, '');
+
+        if (!autresFichiersRepo) {
+            afficherStatutNouveauFichier(
+                "Le dépôt n'est pas encore chargé. Reviens au Déployeur et rouvre « Gérer les autres fichiers ».",
+                "error");
+            return;
+        }
+
+        const erreur = erreurCheminNouveauFichier(chemin);
+        if (erreur) {
+            afficherStatutNouveauFichier(erreur, "error");
+            input.focus();
+            return;
+        }
+
+        // Le fichier existe-t-il déjà ? Comparaison insensible à la casse, pour
+        // ne pas fabriquer un doublon de casse (index.html / Index.html).
+        const bas = chemin.toLowerCase();
+        const existant = autresFichiersChemins.find(p => p.toLowerCase() === bas);
+        if (existant) {
+            if (existant === chemin) {
+                afficherStatutNouveauFichier(
+                    `« ${chemin} » existe déjà dans ce dépôt : sa carte est déjà dans la liste ci-dessous, ` +
+                    "inutile d'en créer une nouvelle.",
+                    "error");
+            } else {
+                afficherStatutNouveauFichier(
+                    `Ce dépôt contient déjà « ${existant} », qui ne diffère de « ${chemin} » que par la casse. ` +
+                    "Créer les deux ferait un doublon de casse ingérable sur GitHub : reprends exactement " +
+                    `l'orthographe « ${existant} », ou supprime d'abord l'ancien fichier.`,
+                    "error");
+            }
+            input.focus();
+            return;
+        }
+
+        // Déjà ajouté pendant cette session, mais pas encore déployé.
+        const dejaEnCours = document.querySelector(
+            `#autres-fichiers-contenu [data-chemin="${chemin.replace(/"/g, '\\"')}"]`);
+        if (dejaEnCours) {
+            afficherStatutNouveauFichier(
+                `Une carte pour « ${chemin} » a déjà été ajoutée plus haut dans cette page.`,
+                "error");
+            dejaEnCours.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return;
+        }
+
+        if (estFichierHtml(chemin)) {
+            const ok = await confirmerModal(
+                `« ${chemin} » est un fichier HTML.\n\n` +
+                "Cette page est faite pour les fichiers AUTRES que le HTML de l'application : le HTML " +
+                "principal se déploie depuis l'étape 3 du Déployeur, et ce fichier n'apparaîtra plus " +
+                "dans cette liste une fois créé.\n\nL'ajouter quand même ?",
+                "Ajouter quand même",
+                "Annuler"
+            );
+            if (!ok) return;
+        }
+
+        const blocRepo = document.querySelector(`#autres-fichiers-contenu [data-repo="${autresFichiersRepo}"]`);
+        if (!blocRepo) {
+            afficherStatutNouveauFichier(
+                "Impossible de trouver la liste des fichiers de ce dépôt. Reviens au Déployeur et rouvre la page.",
+                "error");
+            return;
+        }
+
+        const carte = construireCarteFichier(autresFichiersRepo, chemin, autresFichiersBranche, true);
+
+        // La carte s'insère juste après le titre du dépôt, donc en tête de liste.
+        const titre = blocRepo.querySelector('h2');
+        if (titre && titre.nextSibling) {
+            blocRepo.insertBefore(carte, titre.nextSibling);
+        } else {
+            blocRepo.appendChild(carte);
+        }
+
+        // Un fichier déposé par glisser-déposer remplit directement la zone.
+        let messageContenu = "";
+        if (contenuFichierDepose !== null) {
+            const zoneTexte = carte.querySelector('textarea');
+            if (zoneTexte) {
+                zoneTexte.value = contenuFichierDepose;
+                messageContenu = " Le contenu du fichier déposé y a été placé.";
+            }
+        }
+
+        const messageWorkflow = estFichierWorkflow(chemin)
+            ? "\n\nℹ️ C'est un workflow GitHub Actions : ton token doit porter la portée « workflow » " +
+              "(token classique) ou la permission « Workflows : Read and write » (token fine-grained), " +
+              "sans quoi GitHub refusera la création."
+            : "";
+
+        afficherStatutNouveauFichier(
+            `Carte ajoutée en tête de liste pour « ${chemin} ».${messageContenu}\n\n` +
+            "Rien n'a encore été écrit sur GitHub : colle le contenu, saisis un commentaire de version " +
+            "(3 mots minimum), puis clique « Mettre à jour sur GitHub » sur cette carte pour créer " +
+            "réellement le fichier." + messageWorkflow,
+            "success");
+
+        input.value = '';
+        contenuFichierDepose = null;
+        carte.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // Glisser-déposer d'un fichier sur le bloc d'ajout : le nom remplit le champ
+    // « chemin », le contenu est mis de côté pour la future carte (iMac seulement,
+    // le glisser-déposer de fichiers n'existe pas sur iPhone).
+    function initGlisserDeposerNouveauFichier() {
+        const zone = document.getElementById('zone-depot-nouveau-fichier');
+        if (!zone) return;
+
+        const contientFichier = (e) => e.dataTransfer && e.dataTransfer.types &&
+            Array.prototype.indexOf.call(e.dataTransfer.types, 'Files') !== -1;
+
+        zone.addEventListener('dragenter', (e) => {
+            if (!contientFichier(e)) return;
+            e.preventDefault();
+            zone.classList.add('zone-depot-actif');
+        });
+        zone.addEventListener('dragover', (e) => {
+            if (!contientFichier(e)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            zone.classList.add('zone-depot-actif');
+        });
+        zone.addEventListener('dragleave', (e) => {
+            if (e.target === zone) zone.classList.remove('zone-depot-actif');
+        });
+        zone.addEventListener('drop', (e) => {
+            if (!contientFichier(e)) return;
+            e.preventDefault();
+            zone.classList.remove('zone-depot-actif');
+
+            const fichier = e.dataTransfer.files[0];
+            if (!fichier) return;
+
+            const lecteur = new FileReader();
+            lecteur.onload = () => {
+                contenuFichierDepose = lecteur.result;
+                const input = document.getElementById('input-nouveau-fichier');
+                if (input && !input.value.trim()) input.value = fichier.name;
+                afficherStatutNouveauFichier(
+                    `Fichier « ${fichier.name} » lu (${lecteur.result.length} caractères).\n\n` +
+                    "Vérifie le chemin ci-dessus (ajoute un dossier devant le nom si le fichier ne va " +
+                    "pas à la racine du dépôt), puis clique « Créer la carte ».",
+                    "success");
+            };
+            lecteur.onerror = () => afficherStatutNouveauFichier(
+                `Impossible de lire le fichier « ${fichier.name} ».`, "error");
+            lecteur.readAsText(fichier);
+        });
     }
 
     async function dupliquerCommentaireHtml() {
@@ -3991,9 +4252,10 @@
         box.textContent = texte;
     }
 
-    function ouvrirEditionPleinePage(textareaSource, chemin, repo, branche) {
+    function ouvrirEditionPleinePage(textareaSource, chemin, repo, branche, etatCarte) {
         editionTextareaSource = textareaSource;
         editionCheminCourant = chemin;
+        const carteEncoreVirtuelle = !!(etatCarte && etatCarte.nouveau);
 
         document.getElementById('edition-titre').textContent = `✏️ Édition : ${chemin}`;
         const zone = document.getElementById('edition-textarea');
@@ -4011,6 +4273,23 @@
         document.getElementById('page-autres-fichiers').style.display = 'none';
         document.getElementById('page-edition-texte').style.display = 'block';
         window.scrollTo(0, 0);
+
+        if (carteEncoreVirtuelle) {
+            // Rien à aller chercher : le fichier n'existe pas encore sur GitHub.
+            zone.value = textareaSource.value;
+            zone.disabled = false;
+            zone.placeholder = 'Texte à éditer…';
+            btnVider.disabled = false;
+            btnColler.disabled = false;
+            afficherStatutEdition(
+                `« ${chemin} » n'existe pas encore dans le dépôt : il n'y a aucune version en ligne à ` +
+                "charger. Écris ici le contenu du nouveau fichier — il sera repris dans la zone de la " +
+                "page précédente si tu confirmes le remplacement au retour, puis créé sur GitHub au clic " +
+                "sur « Mettre à jour sur GitHub ».",
+                "success"
+            );
+            return;
+        }
 
         recupererContenuFichierRef(repo, chemin, branche)
             .then(contenu => {
@@ -4329,14 +4608,25 @@
     const DUREE_APPUI_LONG_HISTORIQUE_MS = 5000;
     const TAILLE_PAGE_EXTENSION_HISTORIQUE = 10;
 
-    function activerAppuiLongHistorique(bouton, repo, chemin, branche, listDiv, statutDiv) {
+    function activerAppuiLongHistorique(bouton, repo, chemin, branche, listDiv, statutDiv, etatCarte) {
         let timerAppuiLong = null;
         let appuiLongDeclenche = false;
         let extensionActive = false;
         let extensionDoitSarreter = false;
 
+        // v1.37 : un fichier pas encore créé n'a évidemment aucun commit.
+        const carteEncoreVirtuelle = () => !!(etatCarte && etatCarte.nouveau);
+
+        function messageAucunHistorique() {
+            afficherStatutCarte(statutDiv,
+                `« ${chemin} » n'existe pas encore dans le dépôt « ${repo} » : il n'a donc aucun historique. ` +
+                "Il sera créé, avec son premier commit, dès que tu cliqueras sur « Mettre à jour sur GitHub » " +
+                "sur cette carte.",
+                "error");
+        }
+
         function demarrerMinuteur() {
-            if (bouton.disabled || extensionActive) return;
+            if (bouton.disabled || extensionActive || carteEncoreVirtuelle()) return;
             appuiLongDeclenche = false;
             clearTimeout(timerAppuiLong);
             timerAppuiLong = setTimeout(() => {
@@ -4425,14 +4715,19 @@
                 extensionDoitSarreter = true;
                 return;
             }
+            if (carteEncoreVirtuelle()) {
+                messageAucunHistorique();
+                return;
+            }
             chargerHistoriqueFichier(repo, chemin, branche, listDiv, statutDiv, bouton);
         });
     }
 
-    function construireCarteFichier(repo, chemin, branche) {
+    function construireCarteFichier(repo, chemin, branche, estNouveau) {
         const card = document.createElement('div');
         card.className = 'card';
         card.style.marginBottom = '15px';
+        card.dataset.chemin = chemin;
 
         const label = document.createElement('div');
         label.textContent = chemin;
@@ -4441,6 +4736,38 @@
         const sousLabel = document.createElement('div');
         sousLabel.style.cssText = 'font-size:12px; color:#86868b; margin-bottom:10px;';
         sousLabel.textContent = "Colle le nouveau contenu, ou glisse-dépose un fichier sur la zone — double-clic (ou double-tap) pour la vider.";
+
+        // v1.37 : carte d'un fichier qui n'existe pas encore sur GitHub.
+        // Elle fonctionne comme les autres — le déploiement sans SHA vaut
+        // création — mais l'historique et l'édition en ligne n'ont pas d'objet
+        // tant que le premier commit n'a pas été fait.
+        let badgeNouveau = null;
+        if (estNouveau) {
+            card.style.border = '2px solid #34c759';
+            card.style.background = '#f8fefa';
+
+            badgeNouveau = document.createElement('div');
+            badgeNouveau.style.cssText = 'display:inline-block; font-size:11px; font-weight:700; color:#fff; ' +
+                'background:#34c759; padding:2px 8px; border-radius:20px; margin-bottom:6px;';
+            badgeNouveau.textContent = "NOUVEAU — n'existe pas encore sur GitHub";
+
+            sousLabel.textContent = "Ce fichier sera CRÉÉ dans le dépôt au premier « Mettre à jour sur GitHub ». " +
+                "Colle son contenu, ou glisse-dépose un fichier sur la zone — double-clic (ou double-tap) pour la vider.";
+        }
+
+        const etatCarte = {
+            nouveau: !!estNouveau,
+            // Appelé après la création réussie : la carte redevient une carte ordinaire.
+            marquerExistant() {
+                if (!this.nouveau) return;
+                this.nouveau = false;
+                card.style.border = '';
+                card.style.background = '';
+                if (badgeNouveau && badgeNouveau.parentNode) badgeNouveau.parentNode.removeChild(badgeNouveau);
+                sousLabel.textContent = "Colle le nouveau contenu, ou glisse-dépose un fichier sur la zone — double-clic (ou double-tap) pour la vider.";
+                if (!autresFichiersChemins.includes(chemin)) autresFichiersChemins.push(chemin);
+            }
+        };
 
         const textarea = document.createElement('textarea');
         textarea.style.height = '140px';
@@ -4469,9 +4796,10 @@
         deploiementStatut.className = 'status';
         deploiementStatut.style.marginTop = '10px';
 
-        btnDeployer.addEventListener('click', () => deployerFichierGenerique(repo, chemin, branche, textarea, inputCommentaire, btnDeployer, deploiementStatut));
+        btnDeployer.addEventListener('click', () => deployerFichierGenerique(repo, chemin, branche, textarea, inputCommentaire, btnDeployer, deploiementStatut, etatCarte));
 
         card.appendChild(label);
+        if (badgeNouveau) card.appendChild(badgeNouveau);
         card.appendChild(sousLabel);
         card.appendChild(textarea);
         card.appendChild(btnVider);
@@ -4481,7 +4809,7 @@
             btnEdit.className = 'btn';
             btnEdit.style.cssText = 'background-color:#0071e3; margin-top:5px;';
             btnEdit.textContent = '✏️ Edit';
-            btnEdit.addEventListener('click', () => ouvrirEditionPleinePage(textarea, chemin, repo, branche));
+            btnEdit.addEventListener('click', () => ouvrirEditionPleinePage(textarea, chemin, repo, branche, etatCarte));
             attacherTooltip(btnEdit, "Ouvre en plein écran la dernière version de ce fichier telle qu'elle est sur GitHub, pour l'éditer plus confortablement (pratique sur iPhone). Tu pourras la vider ou coller le contenu du presse-papier, puis choisir en revenant si ce texte remplace le contenu de la zone ci-dessous. Rien n'est envoyé sur GitHub tant que tu ne cliques pas sur « Mettre à jour sur GitHub ».");
             card.appendChild(btnEdit);
         }
@@ -4499,7 +4827,7 @@
         const historiqueListe = document.createElement('div');
         historiqueListe.style.marginTop = '10px';
 
-        activerAppuiLongHistorique(btnHistorique, repo, chemin, branche, historiqueListe, historiqueStatut);
+        activerAppuiLongHistorique(btnHistorique, repo, chemin, branche, historiqueListe, historiqueStatut, etatCarte);
 
         card.appendChild(btnHistorique);
         card.appendChild(historiqueStatut);
@@ -4801,7 +5129,8 @@
             "retente l'envoi. Ton contenu reste dans la zone ci-dessus, il n'est pas perdu.";
     }
 
-    async function deployerFichierGenerique(repo, chemin, branche, textarea, inputCommentaire, bouton, statutDiv) {
+    async function deployerFichierGenerique(repo, chemin, branche, textarea, inputCommentaire, bouton, statutDiv, etatCarte) {
+        const creationAttendue = !!(etatCarte && etatCarte.nouveau);
         const code = textarea.value;
         const commentaire = inputCommentaire.value.trim();
         const journal = creerJournalDeploiement(statutDiv);
@@ -4894,6 +5223,10 @@
                 `Version actuelle lue (identifiant ${String(sha).substring(0, 7)}` +
                 (contenuActuel !== null ? `, ${contenuActuel.length} caractères en ligne).` : `).`),
                 "ok");
+        } else if (creationAttendue) {
+            journal.majEtape(iLecture,
+                `« ${chemin} » est bien absent du dépôt, comme prévu — l'envoi va donc créer le fichier.`,
+                "ok");
         } else {
             journal.majEtape(iLecture,
                 `Version actuelle non lue (${lectureImpossible || "fichier absent"}) — l'envoi va être tenté comme une création.`,
@@ -4917,10 +5250,12 @@
             return;
         }
         journal.majEtape(iComparaison,
-            contenuActuel === null
-                ? `Comparaison impossible (contenu actuel illisible) : l'envoi de ${code.length} caractères est tenté.`
-                : `Comparaison : le contenu diffère (${contenuActuel.length} caractères en ligne → ${code.length} envoyés).`,
-            contenuActuel === null ? "attention" : "ok");
+            contenuActuel !== null
+                ? `Comparaison : le contenu diffère (${contenuActuel.length} caractères en ligne → ${code.length} envoyés).`
+                : (creationAttendue && !sha
+                    ? `Aucune version en ligne à comparer (fichier à créer) : ${code.length} caractères vont être envoyés.`
+                    : `Comparaison impossible (contenu actuel illisible) : l'envoi de ${code.length} caractères est tenté.`),
+            contenuActuel === null && !(creationAttendue && !sha) ? "attention" : "ok");
 
         const bodyPayload = { message: commentaire, content: encoderBase64(code), branch: branche };
         if (sha) bodyPayload.sha = sha;
@@ -4976,17 +5311,30 @@
             });
 
             if (verif.ok) {
-                afficherMessage(`✅ « ${chemin} » mis à jour et VÉRIFIÉ (commit ${shaCommit}) dans « ${repo} ».`, "success");
+                const creationEffective = creationAttendue && !sha;
+                afficherMessage(
+                    creationEffective
+                        ? `✅ « ${chemin} » CRÉÉ et VÉRIFIÉ (commit ${shaCommit}) dans « ${repo} ».`
+                        : `✅ « ${chemin} » mis à jour et VÉRIFIÉ (commit ${shaCommit}) dans « ${repo} ».`,
+                    "success");
                 journal.majEtape(iVerif, "Relecture : le contenu en ligne correspond exactement à ce qui a été envoyé.", "ok");
                 journal.terminer("success", TITRE_SUITE,
-                    "✅ Mise à jour réussie et vérifiée. Le fichier « " + chemin + " » du dépôt « " + repo +
+                    (creationEffective ? "✅ Création réussie et vérifiée. Le fichier « " : "✅ Mise à jour réussie et vérifiée. Le fichier « ") +
+                    chemin + " » du dépôt « " + repo +
                     " » (branche " + branche + ") contient maintenant exactement ce que tu as envoyé, " +
                     "sous le commit " + shaCommit + " — commentaire : « " + commentaire + " ».\n\n" +
                     "➡️ La zone de texte et le champ de commentaire ont été vidés, c'est normal : le " +
                     "travail est enregistré sur GitHub. Si le dépôt est publié via GitHub Pages, le " +
                     "changement est visible en ligne d'ici 30 à 60 secondes. Le bouton « Charger " +
                     "l'historique » de cette carte permet à tout moment de revoir, télécharger ou " +
-                    "restaurer cette version.");
+                    "restaurer cette version." +
+                    (creationEffective
+                        ? "\n\n➡️ Ce fichier fait désormais partie du dépôt : il apparaîtra tout seul dans " +
+                          "la liste à la prochaine ouverture de « Gérer les autres fichiers », et cette " +
+                          "carte se comporte dès maintenant comme les autres (historique et « ✏️ Edit » " +
+                          "sont devenus actifs)."
+                        : ""));
+                if (etatCarte && etatCarte.marquerExistant) etatCarte.marquerExistant();
                 textarea.value = "";
                 inputCommentaire.value = "";
                 bouton.textContent = "Mis à jour ✓";
@@ -5057,6 +5405,17 @@
     synchroniserAuDemarrage();
     initGlisserDeposerHtml();
     initDoubleClicViderZone();
+    initGlisserDeposerNouveauFichier();
+    (function initEntreeNouveauFichier() {
+        const input = document.getElementById('input-nouveau-fichier');
+        if (!input) return;
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                creerCarteNouveauFichier();
+            }
+        });
+    })();
     activerAppuiLongHistoriquePrincipal(document.getElementById('btn-history'), document.getElementById('history-list'));
 </script>
 
