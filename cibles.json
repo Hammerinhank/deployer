@@ -98,8 +98,12 @@
       "name": "Un puzzle",
       "repo": "puzzle",
       "coche": true
+    },
+    {
+      "name": "Photo avec Gemini",
+      "repo": "geminiPhoto"
     }
   ],
   "derniereCible": "vins",
-  "maj": "2026-09-12T07:29:50.473Z"
+  "maj": "2026-09-12T08:24:57.163Z"
 }
