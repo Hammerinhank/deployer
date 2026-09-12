@@ -93,8 +93,12 @@
       "name": "Caméras",
       "repo": "cameras",
       "coche": true
+    },
+    {
+      "name": "Un puzzle",
+      "repo": "puzzle"
     }
   ],
   "derniereCible": "cameras",
-  "maj": "2026-09-09T08:54:06.708Z"
+  "maj": "2026-09-12T06:08:30.650Z"
 }
