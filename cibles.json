@@ -101,9 +101,10 @@
     },
     {
       "name": "Photo avec Gemini",
-      "repo": "geminiPhoto"
+      "repo": "geminiPhoto",
+      "coche": true
     }
   ],
   "derniereCible": "geminiPhoto",
-  "maj": "2026-09-12T08:25:04.517Z"
+  "maj": "2026-09-12T08:26:12.806Z"
 }
