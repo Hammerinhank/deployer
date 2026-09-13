@@ -1,12 +1,12 @@
 {
   "cibles": [
     {
-      "name": "A - Cette appli (de déploiement)\n« Le Déployeur d'Apps » : outil central de gestion des dépôts GitHub et des applications publiées sur GitHub Pages. Il enregistre les identifiants et la liste des cibles (cibles.json), pousse un nouveau code HTML vers le dépôt choisi avec vérification après déploiement, gère l'historique des commits et la restauration de versions, l'édition des autres fichiers, la création de dépôts et un scan de sécurité des jetons.",
-      "repo": "deployer"
-    },
-    {
       "name": "Parkings\nPage de géolocalisation avec carte Leaflet et OpenStreetMap servant de banc d'essai : affiche la position courante et l'adresse obtenue par géocodage inverse. Elle sert de point d'entrée au dépôt qui héberge aussi l'application de stationnement et les fichiers de trajets.",
       "repo": "test-app"
+    },
+    {
+      "name": "A - Cette appli (de déploiement)\n« Le Déployeur d'Apps » : outil central de gestion des dépôts GitHub et des applications publiées sur GitHub Pages. Il enregistre les identifiants et la liste des cibles (cibles.json), pousse un nouveau code HTML vers le dépôt choisi avec vérification après déploiement, gère l'historique des commits et la restauration de versions, l'édition des autres fichiers, la création de dépôts et un scan de sécurité des jetons.",
+      "repo": "deployer"
     },
     {
       "name": "Audio pour jb\n« Bande-son — extraction & analyse » : charge une vidéo, en extrait la piste audio via l'API Web Audio et l'exporte en WAV 16 bits. Analyse complète du son : durée, échantillonnage, crête/RMS en dBFS, forme d'onde, spectrogramme FFT, spectre moyen et spectre temps réel à la lecture. Tout se fait localement, avec mémorisation de la vidéo et des réglages en IndexedDB.",
@@ -106,5 +106,5 @@
     }
   ],
   "derniereCible": "mon-projet",
-  "maj": "2026-09-13T18:51:06.499Z"
+  "maj": "2026-09-13T18:51:12.099Z"
 }
