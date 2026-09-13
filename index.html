@@ -270,7 +270,101 @@
         }
         .commit-item.current { border: 2px solid #34c759; }
         .commit-date { font-weight: 600; color: #1d1d1f; }
-        .commit-msg { color: #86868b; font-size: 13px; margin: 4px 0 10px 0; word-break: break-word; }
+        /* v1.38 : le commentaire de version est désormais rendu en texte mis en
+           forme (titres, listes, gras, code, retours à la ligne conservés). */
+        .commit-msg {
+            color: #515154;
+            font-size: 13px;
+            line-height: 1.5;
+            margin: 6px 0 10px 0;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
+        /* Même mise en forme dans la fenêtre « libellé complet » d'une cible,
+           mais à la taille de texte de cette fenêtre. */
+        .libelle-complet.commit-msg { font-size: 15px; color: #1d1d1f; white-space: normal; }
+        .commit-msg > *:first-child { margin-top: 0; }
+        .commit-msg > *:last-child { margin-bottom: 0; }
+        .commit-msg p { margin: 0 0 8px 0; white-space: pre-wrap; }
+        .commit-msg .titre-1 { font-size: 14.5px; font-weight: 800; color: #1d1d1f; margin: 12px 0 6px 0; }
+        .commit-msg .titre-2 { font-size: 13.5px; font-weight: 700; color: #1d1d1f; margin: 10px 0 5px 0; }
+        .commit-msg .titre-3 { font-size: 13px; font-weight: 700; color: #3a3a3c; margin: 9px 0 4px 0; }
+        .commit-msg ul, .commit-msg ol { margin: 0 0 8px 0; padding-left: 22px; }
+        .commit-msg li { margin: 0 0 4px 0; white-space: pre-wrap; }
+        .commit-msg strong { color: #1d1d1f; font-weight: 700; }
+        .commit-msg code {
+            font-family: "SF Mono", Menlo, Consolas, monospace;
+            font-size: 12px;
+            background: #e8e8ed;
+            color: #1d1d1f;
+            padding: 1px 5px;
+            border-radius: 5px;
+        }
+        .commit-msg pre {
+            font-family: "SF Mono", Menlo, Consolas, monospace;
+            font-size: 12px;
+            background: #e8e8ed;
+            color: #1d1d1f;
+            padding: 10px 12px;
+            border-radius: 8px;
+            margin: 0 0 8px 0;
+            overflow-x: auto;
+            white-space: pre;
+            -webkit-overflow-scrolling: touch;
+        }
+        .commit-msg blockquote {
+            margin: 0 0 8px 0;
+            padding: 2px 0 2px 10px;
+            border-left: 3px solid #d2d2d7;
+            color: #6e6e73;
+            white-space: pre-wrap;
+        }
+        .commit-msg hr { border: none; border-top: 1px solid #d2d2d7; margin: 10px 0; }
+        .commit-msg a { color: #0071e3; }
+        /* Commentaire long : replié par défaut, avec dégradé de fin de zone */
+        .commit-msg.replie {
+            max-height: 190px;
+            overflow: hidden;
+            position: relative;
+        }
+        .commit-msg.replie::after {
+            content: "";
+            position: absolute;
+            left: 0; right: 0; bottom: 0;
+            height: 46px;
+            background: linear-gradient(to bottom, rgba(245,245,247,0), #f5f5f7 88%);
+            pointer-events: none;
+        }
+        .btn-plier {
+            background: none;
+            border: none;
+            color: #0071e3;
+            font-size: 12.5px;
+            font-weight: 600;
+            padding: 2px 0 8px 0;
+            cursor: pointer;
+            width: auto;
+        }
+        /* Champs « Commentaire de version » : multi-lignes depuis la v1.38, pour
+           que le texte collé garde ses retours à la ligne. */
+        textarea.commentaire-version {
+            font-family: inherit;
+            font-size: 15px;
+            height: auto;
+            min-height: 76px;
+            max-height: 320px;
+            line-height: 1.4;
+            resize: vertical;
+        }
+        /* Fenêtre « Historique des versions » (v1.38) */
+        .versions-liste { max-height: 60vh; overflow: auto; -webkit-overflow-scrolling: touch; }
+        .version-entree {
+            border-left: 3px solid #0071e3;
+            padding: 2px 0 2px 12px;
+            margin-bottom: 14px;
+        }
+        .version-entree .version-num { font-weight: 700; color: #1d1d1f; font-size: 14px; }
+        .version-entree .version-txt { color: #515154; font-size: 13.5px; line-height: 1.5; margin-top: 3px; }
         .commit-badge {
             display: inline-block;
             background: #34c759;
@@ -477,7 +571,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <span id="version-badge" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;">v1.37</span></h1>
+    <h1>🚀 Le Déployeur <button type="button" id="version-badge" onclick="ouvrirHistoriqueVersions()" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:5px 12px;border:none;border-radius:20px;vertical-align:middle;width:auto;cursor:pointer;" title="Voir l'historique des versions">v1.38</button></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -568,7 +662,7 @@
         <textarea id="html-code" placeholder="Colle ton code, ou glisse-dépose un fichier .html ici…"></textarea>
 
         <label for="commit-comment">Commentaire de version (obligatoire)</label>
-        <input type="text" id="commit-comment" placeholder="Ex : Ajout du bouton de partage" autocomplete="off">
+        <textarea id="commit-comment" class="commentaire-version" rows="3" placeholder="Ex : Ajout du bouton de partage&#10;&#10;Tu peux coller ici un texte sur plusieurs lignes (titres, listes, gras) : la mise en page est conservée dans l'historique." autocomplete="off" spellcheck="false"></textarea>
 
         <button class="btn" onclick="deployerCode()" style="background-color: #5856d6;" data-tip="Envoie le contenu de la zone de code ci-dessus comme nouvelle version (un nouveau commit) du fichier index.html de l'application cible sélectionnée. Le commentaire de version est obligatoire et apparaîtra dans l'historique (section 4). Une vérification automatique confirme ensuite que le fichier réellement en ligne correspond bien à ce qui vient d'être envoyé.">Mettre à jour sur GitHub</button>
         <button class="btn" id="btn-autres-fichiers" onclick="ouvrirPageAutresFichiers()" style="display:none; background-color: #5856d6; margin-top: 10px;" data-tip="Ouvre un écran séparé listant tous les fichiers du dépôt (autres que le fichier HTML) de l'application actuellement sélectionnée juste au-dessus, si elle est cochée à l'étape 2. Permet de mettre à jour ces fichiers un par un sur GitHub, avec la même logique que ci-dessus (copier-coller ou glisser-déposer, double-clic pour vider).">📁 Gérer les autres fichiers</button>
@@ -749,6 +843,20 @@
             <button class="modal-btn modal-btn-cancel" onclick="fermerCommentaireCible(null)">Ne rien faire</button>
             <button class="modal-btn modal-btn-copier" onclick="appliquerCommentaireCible('ajouter')">➕ Ajouter à la suite</button>
             <button class="modal-btn modal-btn-valider" onclick="appliquerCommentaireCible('remplacer')">♻️ Remplacer</button>
+        </div>
+    </div>
+</div>
+
+<!-- Fenêtre « Historique des versions » (v1.38) -->
+<div id="versions-overlay" class="modal-overlay">
+    <div class="modal-box modal-box-large">
+        <div class="modal-titre">🗂 Historique des versions</div>
+        <div style="font-size:13px; color:#86868b; margin-bottom:10px;">
+            Ce que chaque version de cette page a apporté, de la plus récente à la plus ancienne.
+        </div>
+        <div id="versions-liste" class="versions-liste"></div>
+        <div class="modal-actions" style="margin-top:14px;">
+            <button class="modal-btn modal-btn-cancel" onclick="fermerHistoriqueVersions()">Fermer</button>
         </div>
     </div>
 </div>
@@ -2213,7 +2321,9 @@
             .slice(1)
             .join("\n\n")
             .trim();
-        document.getElementById('libelle-contenu').textContent = contenu || (cible.name || "");
+        const zoneLibelle = document.getElementById('libelle-contenu');
+        zoneLibelle.className = 'libelle-complet commit-msg';
+        zoneLibelle.innerHTML = formaterCommentaireCommit(contenu || (cible.name || ""));
         document.getElementById('libelle-overlay').classList.add('visible');
     }
 
@@ -2873,6 +2983,182 @@
             .replace(/"/g, "&quot;");
     }
 
+    // =====================================================================
+    //  v1.38 — Mise en forme des commentaires de version
+    //  Les commentaires collés (souvent une réponse de Claude ou ChatGPT)
+    //  contiennent des retours à la ligne, des listes, des titres et parfois
+    //  du Markdown. Le HTML écrasait tout cela : ces fonctions le restituent.
+    // =====================================================================
+
+    // Mise en forme à l'intérieur d'une ligne : `code`, **gras**, *italique*,
+    // liens cliquables. Le texte est échappé AVANT toute transformation.
+    function formaterInlineCommentaire(texte) {
+        let t = echapperHtml(texte);
+        t = t.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+        t = t.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+        t = t.replace(/__([^_\n]+)__/g, '<strong>$1</strong>');
+        t = t.replace(/(^|[\s(«"'])\*([^*\n]+)\*(?=$|[\s.,;:!?)»"'])/g, '$1<em>$2</em>');
+        t = t.replace(/(^|[\s(«"'])_([^_\n]+)_(?=$|[\s.,;:!?)»"'])/g, '$1<em>$2</em>');
+        t = t.replace(/https?:\/\/[^\s<]+/g, function (u) {
+            return '<a href="' + u + '" target="_blank" rel="noopener">' + u + '</a>';
+        });
+        return t;
+    }
+
+    // Transforme le commentaire brut en HTML : paragraphes (retours à la ligne
+    // conservés), titres (#, ##, ###), listes à puces (-, *, •, –) et
+    // numérotées, citations (>), blocs ``` et lignes de séparation.
+    function formaterCommentaireCommit(texte) {
+        const lignes = String(texte == null ? "" : texte).replace(/\r\n?/g, "\n").split("\n");
+        let html = "";
+        let liste = null;            // 'ul' ou 'ol' si une liste est ouverte
+        let paragraphe = [];
+        let citation = [];
+        let codeOuvert = false;
+        let codeLignes = [];
+
+        function finirParagraphe() {
+            if (paragraphe.length) {
+                html += "<p>" + paragraphe.map(formaterInlineCommentaire).join("\n") + "</p>";
+                paragraphe = [];
+            }
+        }
+        function finirCitation() {
+            if (citation.length) {
+                html += "<blockquote>" + citation.map(formaterInlineCommentaire).join("\n") + "</blockquote>";
+                citation = [];
+            }
+        }
+        function finirListe() {
+            if (liste) { html += "</" + liste + ">"; liste = null; }
+        }
+        function toutFinir() { finirParagraphe(); finirCitation(); finirListe(); }
+
+        for (let i = 0; i < lignes.length; i++) {
+            const brute = lignes[i].replace(/\s+$/, "");
+            const nue = brute.trim();
+
+            // Bloc de code délimité par ```
+            if (/^```/.test(nue)) {
+                if (codeOuvert) {
+                    html += "<pre>" + echapperHtml(codeLignes.join("\n")) + "</pre>";
+                    codeLignes = [];
+                    codeOuvert = false;
+                } else {
+                    toutFinir();
+                    codeOuvert = true;
+                }
+                continue;
+            }
+            if (codeOuvert) { codeLignes.push(brute); continue; }
+
+            // Ligne vide : elle sépare les blocs
+            if (nue === "") { toutFinir(); continue; }
+
+            // Ligne de séparation
+            if (/^(-{3,}|_{3,}|\*{3,}|—{3,}|={3,})$/.test(nue)) {
+                toutFinir();
+                html += "<hr>";
+                continue;
+            }
+
+            // Titres Markdown
+            let m = nue.match(/^(#{1,6})\s+(.*)$/);
+            if (m) {
+                toutFinir();
+                const niveau = Math.min(m[1].length, 3);
+                html += '<div class="titre-' + niveau + '">'
+                     + formaterInlineCommentaire(m[2].replace(/\s*#+\s*$/, ""))
+                     + '</div>';
+                continue;
+            }
+
+            // Puces
+            m = nue.match(/^[-*+•·–—]\s+(.*)$/);
+            if (m) {
+                finirParagraphe(); finirCitation();
+                if (liste !== 'ul') { finirListe(); html += "<ul>"; liste = 'ul'; }
+                html += "<li>" + formaterInlineCommentaire(m[1]) + "</li>";
+                continue;
+            }
+
+            // Listes numérotées
+            m = nue.match(/^(\d{1,3})[.)]\s+(.*)$/);
+            if (m) {
+                finirParagraphe(); finirCitation();
+                if (liste !== 'ol') { finirListe(); html += "<ol>"; liste = 'ol'; }
+                html += "<li>" + formaterInlineCommentaire(m[2]) + "</li>";
+                continue;
+            }
+
+            // Citations
+            m = nue.match(/^>\s?(.*)$/);
+            if (m) {
+                finirParagraphe(); finirListe();
+                citation.push(m[1]);
+                continue;
+            }
+
+            // Ligne indentée qui prolonge le point de liste précédent
+            if (liste && /^\s{2,}\S/.test(brute) && /<\/li>$/.test(html)) {
+                html = html.slice(0, -5) + "\n" + formaterInlineCommentaire(nue) + "</li>";
+                continue;
+            }
+
+            finirCitation(); finirListe();
+            paragraphe.push(nue);
+        }
+
+        if (codeOuvert && codeLignes.length) {
+            html += "<pre>" + echapperHtml(codeLignes.join("\n")) + "</pre>";
+        }
+        toutFinir();
+
+        return html || "<p>(aucun commentaire)</p>";
+    }
+
+    // Un commentaire long est replié au départ, pour que la liste des versions
+    // reste parcourable d'un coup d'œil.
+    function commentaireEstLong(texte) {
+        const t = String(texte == null ? "" : texte);
+        return t.length > 420 || t.split("\n").length > 8;
+    }
+
+    function blocCommentaireHtml(msg) {
+        const long = commentaireEstLong(msg);
+        return '<div class="commit-msg' + (long ? ' replie' : '') + '">'
+             + formaterCommentaireCommit(msg) + '</div>'
+             + (long ? '<button type="button" class="btn-plier">▾ Afficher tout le commentaire</button>' : '');
+    }
+
+    function activerPliageCommentaire(item) {
+        const bouton = item.querySelector('.btn-plier');
+        const zone = item.querySelector('.commit-msg');
+        if (!bouton || !zone) return;
+        bouton.addEventListener('click', () => {
+            const replie = zone.classList.toggle('replie');
+            bouton.textContent = replie ? "▾ Afficher tout le commentaire" : "▴ Réduire le commentaire";
+        });
+    }
+
+    // Champs « Commentaire de version » : zones de texte qui grandissent avec
+    // le contenu collé (v1.38).
+    function ajusterHauteurCommentaire(champ) {
+        if (!champ) return;
+        champ.style.height = 'auto';
+        champ.style.height = Math.min(champ.scrollHeight + 2, 320) + 'px';
+    }
+
+    function activerAutoHauteurCommentaire(champ) {
+        if (!champ) return;
+        ['input', 'change', 'paste', 'cut'].forEach(function (ev) {
+            champ.addEventListener(ev, function () {
+                setTimeout(function () { ajusterHauteurCommentaire(champ); }, 0);
+            });
+        });
+        ajusterHauteurCommentaire(champ);
+    }
+
     async function detecterDoublonsCasse(repo, nomFichier) {
         try {
             const url = `https://api.github.com/repos/${config.user}/${repo}/contents/`;
@@ -3054,6 +3340,7 @@
                 );
                 document.getElementById('html-code').value = "";
                 document.getElementById('commit-comment').value = "";
+                ajusterHauteurCommentaire(document.getElementById('commit-comment'));
             } else if (verifOk && aDoublons) {
                 afficherMessage(
                     `✅ Le contenu a bien été mis à jour (commit ${shaCommit}).\n\n` +
@@ -3093,7 +3380,7 @@
         item.className = 'commit-item' + (estActuelle ? ' current' : '');
         item.innerHTML = `
             <div class="commit-date">${dateStr}${estActuelle ? '<span class="commit-badge">Version actuelle</span>' : ''}</div>
-            <div class="commit-msg">${echapperHtml(msg)}</div>
+            ${blocCommentaireHtml(msg)}
             <div class="commit-actions">
                 <button class="btn-small btn-view">Voir</button>
                 <button class="btn-small btn-copy">Copier</button>
@@ -3118,6 +3405,8 @@
             attacherTooltip(btnRestore, `Republie le contenu de cette version du ${dateStr} en créant un NOUVEAU commit sur index.html. La version actuelle n'est pas effacée : elle reste dans l'historique et tu pourras toujours y revenir ensuite.`);
             btnRestore.addEventListener('click', () => restaurerVersion(repo, commit.sha, dateStr));
         }
+
+        activerPliageCommentaire(item);
 
         return item;
     }
@@ -4213,7 +4502,7 @@
                 if (commits && commits.length > 0) {
                     const commentaire = commits[0].commit.message;
                     const champs = bloc.querySelectorAll('.commentaire-fichier');
-                    champs.forEach(champ => { champ.value = commentaire; });
+                    champs.forEach(champ => { champ.value = commentaire; ajusterHauteurCommentaire(champ); });
                     nbReussis++;
                 } else {
                     echecs.push(`${repo} (aucun commit trouvé sur index.html)`);
@@ -4541,7 +4830,7 @@
         item.className = 'commit-item' + (estActuelle ? ' current' : '');
         item.innerHTML = `
             <div class="commit-date">${dateStr}${estActuelle ? '<span class="commit-badge">Version actuelle</span>' : ''}</div>
-            <div class="commit-msg">${echapperHtml(msg)}</div>
+            ${blocCommentaireHtml(msg)}
             <div class="commit-actions">
                 <button class="btn-small btn-view">Voir</button>
                 <button class="btn-small btn-copy">Copier</button>
@@ -4566,6 +4855,8 @@
             attacherTooltip(btnRestore, `Republie le contenu de cette version du ${dateStr} en créant un NOUVEAU commit sur « ${chemin} ». La version actuelle n'est pas effacée : elle reste dans l'historique et tu pourras toujours y revenir ensuite.`);
             btnRestore.addEventListener('click', () => restaurerVersionFichier(repo, chemin, branche, commit.sha, dateStr, listDiv, statutDiv, btn));
         }
+
+        activerPliageCommentaire(item);
 
         return item;
     }
@@ -4780,11 +5071,15 @@
         btnVider.addEventListener('click', () => viderZoneAvecConfirmationGenerique(textarea));
         attacherTooltip(btnVider, "Vide (après confirmation) le contenu de cette zone. Ne touche à rien sur GitHub — seulement au texte affiché ici. Le double-clic (ou double-tap) sur la zone fait la même chose.");
 
-        const inputCommentaire = document.createElement('input');
-        inputCommentaire.type = 'text';
-        inputCommentaire.className = 'commentaire-fichier';
-        inputCommentaire.placeholder = 'Commentaire de version (obligatoire, 3 mots minimum)';
+        // v1.38 : zone de texte (et non plus champ d'une ligne) pour que le
+        // commentaire collé garde ses retours à la ligne et sa mise en page.
+        const inputCommentaire = document.createElement('textarea');
+        inputCommentaire.className = 'commentaire-fichier commentaire-version';
+        inputCommentaire.rows = 3;
+        inputCommentaire.spellcheck = false;
+        inputCommentaire.placeholder = 'Commentaire de version (obligatoire, 3 mots minimum) — plusieurs lignes acceptées';
         inputCommentaire.style.marginTop = '10px';
+        activerAutoHauteurCommentaire(inputCommentaire);
 
         const btnDeployer = document.createElement('button');
         btnDeployer.className = 'btn';
@@ -5337,6 +5632,7 @@
                 if (etatCarte && etatCarte.marquerExistant) etatCarte.marquerExistant();
                 textarea.value = "";
                 inputCommentaire.value = "";
+                ajusterHauteurCommentaire(inputCommentaire);
                 bouton.textContent = "Mis à jour ✓";
                 setTimeout(() => { bouton.textContent = origineBouton; bouton.disabled = false; }, 2000);
             } else {
@@ -5383,6 +5679,50 @@
     }
 
 
+    // =====================================================================
+    //  Historique des versions de cette page (v1.38)
+    //  Le numéro de version en haut de page est un bouton : il ouvre cette
+    //  liste. Ajouter ici une entrée à CHAQUE nouvelle version.
+    // =====================================================================
+    const HISTORIQUE_VERSIONS = [
+        ["v1.38", "Les commentaires de version gardent leur mise en page : champs « Commentaire de version » devenus des zones multi-lignes, et affichage enrichi dans l'historique (titres, listes, gras, code, retours à la ligne). Les commentaires longs sont repliés avec un bouton « Afficher tout ». Le numéro de version ouvre cette fenêtre."],
+        ["v1.37", "Page « autres fichiers » : bouton « ➕ Ajouter un fichier au dépôt » (carte NOUVEAU créée localement, fichier réellement créé au premier envoi, contrôles du chemin et des doublons de casse)."],
+        ["v1.32 à v1.36", "Corrections et ajustements divers (détail non consigné)."],
+        ["v1.31", "La restauration d'une ancienne version déclenche aussi la surveillance de publication, avec un message nommant la version restaurée."],
+        ["v1.30", "Un clic sur « Charger l'historique » alors qu'il est affiché l'efface réellement ; le clic suivant le recharge."],
+        ["v1.29", "Surveillance de publication silencieuse pendant l'attente ; message « URL enfin disponible » seulement au-delà de 10 s."],
+        ["v1.28", "Après chaque déploiement, surveillance de la publication GitHub Pages toutes les 5 s, avec liseré rouge puis vert autour du bouton."],
+        ["v1.27", "Diagnostic dédié aux fichiers .github/workflows (portée « workflow » manquante sur le token) et avertissement préventif."],
+        ["v1.26", "Page « autres fichiers » : zone de feedback sous chaque bouton d'envoi, en deux sections (déroulement pas à pas, puis diagnostic et marche à suivre)."],
+        ["v1.24", "Liste des cibles : seule la première ligne du libellé s'affiche, avec un bouton « More » ouvrant le texte complet."],
+        ["v1.23", "Le libellé d'une cible peut tenir sur plusieurs lignes (zone de texte, Ctrl/Cmd+Entrée pour enregistrer)."],
+        ["v1.22", "Bouton « 💬 Commentaire » dans l'édition d'une cible : lit commentaires-html.json et propose de remplacer ou compléter le libellé."],
+        ["v1.21", "Bouton rouge « 🗑 Vider » dans la fenêtre des commentaires HTML, avec confirmation."],
+        ["v1.20", "Préambule d'inventaire plus exigeant et messages d'erreur de validation du JSON plus précis."],
+        ["v1.19", "Préambule à coller dans ChatGPT/Claude en tête de l'inventaire, et enregistrement des commentaires HTML dans commentaires-html.json."],
+        ["v1.18", "Bouton « Copier l'inventaire des dépôts » (fichiers HTML en tête), avec copie automatique et fenêtre d'affichage."],
+        ["v1.15 à v1.17", "Corrections et ajustements divers (détail non consigné)."],
+        ["v1.14", "Bouton « Charger l'historique » sur chaque carte de fichier de la page « autres fichiers »."],
+        ["v1.13", "L'édition plein écran s'ouvre sur la dernière version du fichier récupérée depuis GitHub."],
+        ["v1.12", "Bouton « ✏️ Edit » ouvrant une page d'édition plein écran pour les fichiers texte."],
+        ["v1.6 à v1.11", "Réorganisation des cibles par glisser-déposer, modale de confirmation maison, création de dépôt, copie presse-papier robuste sur iOS, vérification post-déploiement, scan des tokens en dur."]
+    ];
+
+    function ouvrirHistoriqueVersions() {
+        const liste = document.getElementById('versions-liste');
+        liste.innerHTML = HISTORIQUE_VERSIONS.map(function (v) {
+            return '<div class="version-entree">'
+                 + '<div class="version-num">' + echapperHtml(v[0]) + '</div>'
+                 + '<div class="version-txt">' + echapperHtml(v[1]) + '</div>'
+                 + '</div>';
+        }).join("");
+        document.getElementById('versions-overlay').classList.add('visible');
+    }
+
+    function fermerHistoriqueVersions() {
+        document.getElementById('versions-overlay').classList.remove('visible');
+    }
+
     // Initialisation au chargement de la page
     document.getElementById('inventaire-overlay').addEventListener('click', function (e) {
         if (e.target === this) fermerInventaireDepots();
@@ -5417,6 +5757,10 @@
         });
     })();
     activerAppuiLongHistoriquePrincipal(document.getElementById('btn-history'), document.getElementById('history-list'));
+    document.getElementById('versions-overlay').addEventListener('click', function (e) {
+        if (e.target === this) fermerHistoriqueVersions();
+    });
+    activerAutoHauteurCommentaire(document.getElementById('commit-comment'));
 </script>
 
 </body>
