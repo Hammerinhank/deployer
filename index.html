@@ -571,7 +571,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <button type="button" id="version-badge" onclick="ouvrirHistoriqueVersions()" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:5px 12px;border:none;border-radius:20px;vertical-align:middle;width:auto;cursor:pointer;" title="Voir l'historique des versions">v1.38</button></h1>
+    <h1>🚀 Le Déployeur <button type="button" id="version-badge" onclick="ouvrirHistoriqueVersions()" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:5px 12px;border:none;border-radius:20px;vertical-align:middle;width:auto;cursor:pointer;" title="Voir l'historique des versions">v1.39</button></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -674,7 +674,7 @@
         <label for="select-history-target">Application concernée</label>
         <select id="select-history-target"></select>
 
-        <button class="btn" id="btn-copier-url" onclick="copierUrlAppli(this)" style="background-color: #34c759;" data-tip="Calcule l'adresse GitHub Pages de l'application sélectionnée (du type https://tonpseudo.github.io/depot/), la copie dans le presse-papier, et l'affiche juste en dessous sous forme de lien cliquable pour vérifier tout de suite qu'elle fonctionne bien. Après un déploiement ou une restauration, ce bouton s'entoure d'un double liseré rouge tant que GitHub Pages n'a pas publié la nouvelle version, puis d'un double liseré vert dès que l'URL sert le bon contenu.">🔗 Copier l'URL de l'appli</button>
+        <button class="btn" id="btn-copier-url" onclick="copierUrlAppli(this)" style="background-color: #34c759;" data-tip="Calcule l'adresse GitHub Pages de l'application sélectionnée (du type https://tonpseudo.github.io/depot/), la copie dans le presse-papier, et l'affiche juste en dessous sous forme de lien cliquable pour vérifier tout de suite qu'elle fonctionne bien. Après un déploiement ou une restauration, ce bouton s'entoure d'un double liseré rouge tant que GitHub Pages n'a pas publié la nouvelle version, puis d'un double liseré vert dès que l'URL sert le bon contenu. Depuis la v1.39, il contrôle aussi que l'adresse sert bien la DERNIÈRE version : si elle sert une version antérieure, il dit laquelle, indique si la cause est GitHub Pages ou le cache de cet appareil, et affiche la marche à suivre.">🔗 Copier l'URL de l'appli</button>
         <div id="url-appli-ligne"></div>
         <button class="btn" id="btn-history" style="background-color: #ff9500; margin-top: 10px; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;" data-tip="Récupère la liste des commits (versions successives) du fichier index.html de l'application sélectionnée, avec leur date et leur commentaire de version, pour pouvoir ensuite consulter, copier, télécharger ou restaurer une ancienne version ci-dessous. Un nouveau clic pendant que l'historique est affiché l'efface complètement de l'écran ; le clic suivant le recharge depuis GitHub. Reste appuyé plus de 5 secondes pour charger tout l'historique en continu (le bouton devient rouge) ; un simple appui dessus pendant qu'il est rouge arrête le chargement.">Charger l'historique</button>
 
@@ -3867,6 +3867,27 @@
         ligne.appendChild(lien);
     }
 
+    // v1.39 : second lien, avec paramètre anti-cache, proposé quand c'est le
+    // cache du navigateur (et non GitHub) qui sert l'ancienne version.
+    function ajouterLienAntiCache(url) {
+        const ligne = document.getElementById('url-appli-ligne');
+        if (!ligne || !url) return null;
+        const urlAnti = `${url}${url.includes('?') ? '&' : '?'}v=${Date.now()}`;
+        const label = document.createElement('div');
+        label.className = 'url-label';
+        label.style.marginTop = '10px';
+        label.textContent = "Lien anti-cache (force le rechargement de la dernière version) :";
+        const lien = document.createElement('a');
+        lien.className = 'url-lien';
+        lien.href = urlAnti;
+        lien.target = '_blank';
+        lien.rel = 'noopener';
+        lien.textContent = urlAnti;
+        ligne.appendChild(label);
+        ligne.appendChild(lien);
+        return urlAnti;
+    }
+
     function afficherLigneUrlAppliInactive(repo, url) {
         const ligne = document.getElementById('url-appli-ligne');
         if (!ligne) return;
@@ -3936,6 +3957,197 @@
         }
     }
 
+    // =====================================================================
+    //  v1.39 — « L'URL sert-elle vraiment la dernière version ? »
+    //  Symptôme rencontré : le dernier commit est bien dans l'historique,
+    //  mais l'URL publique lance encore la version précédente. Deux causes
+    //  très différentes, que ce contrôle sépare :
+    //    • GitHub Pages n'a pas (ou mal) publié → tout le monde voit l'ancienne ;
+    //    • le cache du navigateur / de l'icône d'accueil → seul cet appareil.
+    // =====================================================================
+
+    const MAX_VERSIONS_COMPAREES = 6;   // profondeur de recherche dans l'historique
+
+    function dateCommitLisible(iso) {
+        const d = new Date(iso);
+        return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+            + " à " + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // Lit ce que l'URL publique renvoie réellement. contournerCache = true
+    // ajoute un paramètre unique et interdit le cache : on obtient alors ce que
+    // GitHub sert VRAIMENT maintenant. false = ce que ce navigateur servirait.
+    async function lireTextePublie(url, contournerCache) {
+        const cible = contournerCache
+            ? `${url}${url.includes('?') ? '&' : '?'}_=${Date.now()}`
+            : url;
+        const rep = await fetch(cible, contournerCache ? { cache: 'no-store' } : {});
+        if (!rep.ok) throw new Error(`${rep.status} ${rep.statusText}`);
+        return await rep.text();
+    }
+
+    async function lireDernierBuildPages(repo) {
+        try {
+            const rep = await fetch(
+                `https://api.github.com/repos/${config.user}/${repo}/pages/builds/latest`,
+                { headers: headersGitHub(), cache: "no-store" }
+            );
+            if (!rep.ok) return null;
+            return await rep.json();
+        } catch (_) {
+            return null;
+        }
+    }
+
+    // À quelle version de l'historique correspond le contenu réellement servi ?
+    async function identifierVersionServie(repo, texteServi, commits) {
+        const profondeur = Math.min(commits.length, MAX_VERSIONS_COMPAREES);
+        for (let i = 0; i < profondeur; i++) {
+            let contenu;
+            try {
+                contenu = await recupererContenuVersion(repo, commits[i].sha);
+            } catch (_) {
+                continue;
+            }
+            if (contenuCorrespond(texteServi, contenu)) {
+                return { rang: i, commit: commits[i] };
+            }
+        }
+        return null;
+    }
+
+    function decrireVersionServie(servie) {
+        if (!servie) {
+            return "un contenu qui ne correspond à aucune des " + MAX_VERSIONS_COMPAREES +
+                   " dernières versions de index.html";
+        }
+        const date = dateCommitLisible(servie.commit.commit.author.date);
+        const sha = servie.commit.sha.substring(0, 7);
+        const rang = servie.rang === 1 ? "l'avant-dernière"
+            : (servie.rang === 2 ? "l'antépénultième" : `celle d'il y a ${servie.rang} versions`);
+        return `la version du ${date} (commit ${sha}), soit ${rang}`;
+    }
+
+    // Contrôle complet, lancé juste après la copie de l'URL.
+    async function verifierVersionServieParUrl(repo, url) {
+        afficherMessage("Contrôle en cours : l'URL sert-elle bien la dernière version ?…", "success");
+        try {
+            const commits = await recupererCommitsFichier(repo, 'index.html', 10);
+            if (!Array.isArray(commits) || commits.length === 0) {
+                afficherMessage(
+                    `URL copiée, mais « ${repo} » n'a aucun commit sur index.html : ` +
+                    "il n'y a donc rien à comparer.",
+                    "error"
+                );
+                return;
+            }
+
+            const dernier = commits[0];
+            const shaCourt = dernier.sha.substring(0, 7);
+            const dateDernier = dateCommitLisible(dernier.commit.author.date);
+            const contenuAttendu = await recupererContenuVersion(repo, dernier.sha);
+
+            let texteFrais;
+            try {
+                texteFrais = await lireTextePublie(url, true);
+            } catch (e) {
+                afficherMessage(
+                    "URL copiée, mais elle n'a pas pu être lue pour vérification " +
+                    `(${e.message}).\n\n` +
+                    "Si c'est un 404, GitHub Pages n'a peut-être pas encore publié le site, " +
+                    "ou la publication est désactivée. Réessaie dans une minute.",
+                    "error"
+                );
+                return;
+            }
+
+            // Ce que CE navigateur servirait, cache compris.
+            let texteCache = null;
+            try { texteCache = await lireTextePublie(url, false); } catch (_) { texteCache = null; }
+
+            const fraisOk = contenuCorrespond(texteFrais, contenuAttendu);
+            const cacheOk = (texteCache === null) ? fraisOk : contenuCorrespond(texteCache, contenuAttendu);
+
+            // ---------- Cas 1 : tout est bon ----------
+            if (fraisOk && cacheOk) {
+                afficherMessage(
+                    "✅ URL VÉRIFIÉE\n\n" +
+                    `${url}\nsert bien la dernière version : commit ${shaCourt} du ${dateDernier}.`,
+                    "success"
+                );
+                return;
+            }
+
+            // ---------- Cas 2 : GitHub est à jour, c'est le cache local ----------
+            if (fraisOk && !cacheOk) {
+                const servie = await identifierVersionServie(repo, texteCache, commits);
+                const urlAnti = ajouterLienAntiCache(url);
+                afficherMessage(
+                    "🟠 C'EST LE CACHE DE CET APPAREIL, PAS GITHUB\n\n" +
+                    `GitHub Pages publie bien la dernière version (commit ${shaCourt} du ${dateDernier}), ` +
+                    "mais ce navigateur te ressert " + decrireVersionServie(servie) + ".\n\n" +
+                    "QUE FAIRE :\n" +
+                    "1. Ouvre le « lien anti-cache » qui vient de s'afficher sous l'URL" +
+                    (urlAnti ? " :\n   " + urlAnti + "\n" : ".\n") +
+                    "2. Si l'appli est sur ton écran d'accueil : ferme-la complètement " +
+                    "(multitâche, balayage vers le haut), puis rouvre-la. Si elle reste vieille, " +
+                    "supprime l'icône, ouvre le lien anti-cache dans Safari et réinstalle l'icône.\n" +
+                    "3. Sinon : Réglages → Safari → Effacer historique, données de site.\n\n" +
+                    "Les autres appareils, eux, voient déjà la bonne version.",
+                    "error"
+                );
+                return;
+            }
+
+            // ---------- Cas 3 : GitHub Pages sert réellement une ancienne version ----------
+            const servie = await identifierVersionServie(repo, texteFrais, commits);
+            const build = await lireDernierBuildPages(repo);
+            const doublons = await detecterDoublonsCasse(repo, "index.html");
+            const aDoublons = Array.isArray(doublons) && doublons.length > 1;
+
+            let etatBuild = "";
+            if (build && build.status) {
+                const quand = build.updated_at ? ` (${dateCommitLisible(build.updated_at)})` : "";
+                if (build.status === "building") {
+                    etatBuild = `\nÉtat de la publication Pages : EN COURS${quand}. ` +
+                                "C'est probablement juste ça : attends 1 à 2 minutes et reclique ce bouton.\n";
+                } else if (build.status === "errored") {
+                    const cause = build.error && build.error.message ? ` — ${build.error.message}` : "";
+                    etatBuild = `\nÉtat de la publication Pages : EN ÉCHEC${quand}${cause}.\n` +
+                                "C'est la cause : le commit existe, mais rien n'a été publié.\n";
+                } else {
+                    etatBuild = `\nÉtat de la publication Pages : ${build.status}${quand}.\n`;
+                }
+            }
+
+            afficherMessage(
+                "⛔ L'URL NE SERT PAS LA DERNIÈRE VERSION\n\n" +
+                `Dernier commit sur index.html : ${shaCourt} du ${dateDernier}.\n` +
+                `Ce que l'URL sert réellement : ${decrireVersionServie(servie)}.\n` +
+                etatBuild +
+                (aDoublons
+                    ? `\n⚠️ Le dépôt contient plusieurs fichiers index.html ne différant que par la casse : ` +
+                      `${doublons.join("   ·   ")}.\nC'est une cause classique : tu écris dans l'un, Pages publie l'autre. ` +
+                      "Supprime le doublon sur GitHub (section « Gérer les autres fichiers » ou directement sur github.com).\n"
+                    : "") +
+                "\nQUE FAIRE, DANS L'ORDRE :\n" +
+                "1. Attends 1 à 2 minutes et reclique sur ce bouton : la publication peut être en retard.\n" +
+                `2. Ouvre l'onglet Actions du dépôt : https://github.com/${config.user}/${repo}/actions\n` +
+                "   Si « pages build and deployment » est en échec (croix rouge), c'est lui qui bloque.\n" +
+                `3. Vérifie https://github.com/${config.user}/${repo}/settings/pages : la branche et le ` +
+                "dossier publiés doivent être ceux dans lesquels tu déploies.\n" +
+                "4. En dernier recours, redéploie : « Restaurer » sur la dernière version dans l'historique " +
+                "ci-dessous, ou renvoie le même code depuis l'étape 3. Un nouveau commit relance le build.",
+                "error"
+            );
+        } catch (e) {
+            afficherMessage(
+                `URL copiée, mais le contrôle « est-ce bien la dernière version ? » n'a pas abouti : ${e.message}`,
+                "error"
+            );
+        }
+    }
+
     async function copierUrlAppli(bouton) {
         if (!verifierConfig()) return;
         const repo = document.getElementById('select-history-target').value;
@@ -3988,11 +4200,13 @@
         } else {
             afficherMessage(
                 "Le presse-papier n'a pas pu être utilisé sur cet appareil.\n\n" +
-                "Voici l'URL à copier à la main (elle ouvre toujours la dernière version) :\n\n" +
-                url,
+                "Voici l'URL à copier à la main :\n\n" + url,
                 "error"
             );
         }
+
+        // v1.39 : contrôle systématique du contenu réellement servi par l'URL.
+        await verifierVersionServieParUrl(repo, url);
     }
 
     async function restaurerVersion(repo, commitSha, dateStr) {
@@ -5685,6 +5899,7 @@
     //  liste. Ajouter ici une entrée à CHAQUE nouvelle version.
     // =====================================================================
     const HISTORIQUE_VERSIONS = [
+        ["v1.39", "« 🔗 Copier l'URL de l'appli » contrôle désormais que l'adresse sert bien la dernière version : il compare le contenu réellement publié au dernier commit, identifie la version servie si ce n'est pas la bonne, distingue un retard de publication GitHub Pages d'un cache local du navigateur, et affiche la marche à suivre correspondante (avec lien anti-cache le cas échéant)."],
         ["v1.38", "Les commentaires de version gardent leur mise en page : champs « Commentaire de version » devenus des zones multi-lignes, et affichage enrichi dans l'historique (titres, listes, gras, code, retours à la ligne). Les commentaires longs sont repliés avec un bouton « Afficher tout ». Le numéro de version ouvre cette fenêtre."],
         ["v1.37", "Page « autres fichiers » : bouton « ➕ Ajouter un fichier au dépôt » (carte NOUVEAU créée localement, fichier réellement créé au premier envoi, contrôles du chemin et des doublons de casse)."],
         ["v1.32 à v1.36", "Corrections et ajustements divers (détail non consigné)."],
