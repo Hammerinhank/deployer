@@ -34,7 +34,8 @@
     },
     {
       "name": "Jeu vocabulaire vietnamien\n« Vocabulaire & IA » : jeu d'association de mots vietnamien/français en deux colonnes, alimenté par un fichier de vocabulaire hébergé sur GitHub. Modes de masquage progressifs, défi écriture, comptage et visualisation de la progression par section, édition et nettoyage des données, requêtes ChatGPT paramétrables. La progression est synchronisée sur GitHub (vocab-progress.json).",
-      "repo": "mon-projet"
+      "repo": "mon-projet",
+      "coche": true
     },
     {
       "name": "analyser Texte Vietnamien\nProbablement : outil d'analyse de texte vietnamien. On colle un texte et l'application le décompose (mots, syllabes, tons, sens) pour en faciliter l'étude, avec mise en couleur du vocabulaire et renvoi vers une IA pour approfondir un mot. Complément des autres outils d'apprentissage du vietnamien.",
@@ -110,5 +111,5 @@
     }
   ],
   "derniereCible": "mon-projet",
-  "maj": "2026-09-17T08:43:40.313Z"
+  "maj": "2026-09-17T08:43:58.688Z"
 }
