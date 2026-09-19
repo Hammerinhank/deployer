@@ -108,8 +108,12 @@
     {
       "name": "Prix",
       "repo": "prix"
+    },
+    {
+      "name": "Accéder à l’iMac",
+      "repo": "accederimac"
     }
   ],
   "derniereCible": "deployer",
-  "maj": "2026-09-18T11:45:43.716Z"
+  "maj": "2026-09-19T06:55:32.429Z"
 }
