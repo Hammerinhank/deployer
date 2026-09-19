@@ -112,8 +112,12 @@
     {
       "name": "Accéder à l’iMac",
       "repo": "accederimac"
+    },
+    {
+      "name": "Bibliothèque",
+      "repo": "bibliotheque"
     }
   ],
   "derniereCible": "accederimac",
-  "maj": "2026-09-19T06:55:37.186Z"
+  "maj": "2026-09-19T19:55:34.175Z"
 }
