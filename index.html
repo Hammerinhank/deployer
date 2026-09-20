@@ -106,6 +106,39 @@
             font-size: 12.5px;
             background: #6e6e73;
         }
+        /* v1.42 : carte d'un fichier binaire (pas de zone de texte) */
+        .zone-binaire {
+            margin-top: 10px;
+            padding: 18px 14px;
+            border: 2px dashed #5856d6;
+            border-radius: 8px;
+            background: #fbfbfd;
+            color: #515154;
+            font-size: 13.5px;
+            text-align: center;
+        }
+        .zone-binaire.zone-depot-actif { background: #f0f0ff; color: #1d1d1f; }
+        .info-binaire {
+            margin-top: 10px;
+            padding: 10px 12px;
+            border: 1px solid #e5e5ea;
+            border-radius: 8px;
+            background: #fff;
+            font-size: 13px;
+            color: #1d1d1f;
+            line-height: 1.5;
+            word-break: break-all;
+        }
+        .info-binaire code { font-size: 12px; color: #515154; }
+        img.apercu-binaire {
+            display: block;
+            margin-top: 8px;
+            max-width: 160px;
+            max-height: 160px;
+            border: 1px solid #e5e5ea;
+            border-radius: 6px;
+            background: repeating-conic-gradient(#f0f0f0 0% 25%, #fff 0% 50%) 50% / 16px 16px;
+        }
         /* Zone de glisser-déposer du bloc « Ajouter un fichier » (v1.37) */
         #zone-depot-nouveau-fichier {
             margin-top: 10px;
@@ -599,7 +632,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <button type="button" id="version-badge" onclick="ouvrirHistoriqueVersions()" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:5px 12px;border:none;border-radius:20px;vertical-align:middle;width:auto;cursor:pointer;" title="Voir l'historique des versions">v1.41</button></h1>
+    <h1>🚀 Le Déployeur <button type="button" id="version-badge" onclick="ouvrirHistoriqueVersions()" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:5px 12px;border:none;border-radius:20px;vertical-align:middle;width:auto;cursor:pointer;" title="Voir l'historique des versions">v1.42</button></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -2995,6 +3028,222 @@
         return decodeURIComponent(escape(atob(b64.replace(/\n/g, ''))));
     }
 
+    // =====================================================================
+    //  v1.42 — Fichiers binaires : lecture en OCTETS, commit en base64 brut
+    //
+    //  Bug corrigé : jusqu'ici tout fichier déposé était lu avec readAsText
+    //  puis ré-encodé en UTF-8 (encoderBase64). Pour un binaire, chaque octet
+    //  ≥ 0x80 devenait le caractère de remplacement U+FFFD (EF BF BD) et les
+    //  0x0D sautaient : la signature PNG 89 50 4E 47 0D 0A 1A 0A arrivait en
+    //  EF BF BD 50 4E 47 0A 1A 0A. Destruction irréversible.
+    //  Désormais : ArrayBuffer → Uint8Array → base64 par tranches, sans
+    //  jamais passer par une chaîne de caractères décodée.
+    // =====================================================================
+
+    const TRANCHE_BASE64 = 8192;             // octets encodés d'un coup (pile de String.fromCharCode)
+    const TRANCHES_PAR_RESPIRATION = 16;     // on rend la main à l'affichage toutes les 128 ko
+
+    function lireFichierEnOctets(fichier) {
+        return new Promise((resolve, reject) => {
+            const lecteur = new FileReader();
+            lecteur.onload = () => resolve(new Uint8Array(lecteur.result));
+            lecteur.onerror = () => reject(new Error("fichier illisible sur cet appareil"));
+            lecteur.readAsArrayBuffer(fichier);
+        });
+    }
+
+    // Décodage UTF-8 STRICT : renvoie null au moindre octet invalide.
+    function decoderUtf8Strict(octets) {
+        try {
+            return new TextDecoder('utf-8', { fatal: true }).decode(octets);
+        } catch (_) {
+            return null;
+        }
+    }
+
+    // Un fichier n'est traité comme du TEXTE que s'il est décodable en UTF-8
+    // strict ET que son extension figure parmi les extensions textuelles.
+    // Sinon il est binaire, quelle que soit son extension.
+    function analyserOctets(nomOuChemin, octets) {
+        const extensionTexte = estFichierTexte(nomOuChemin);
+        const texte = extensionTexte ? decoderUtf8Strict(octets) : null;
+        const estTexte = extensionTexte && texte !== null;
+        return {
+            estTexte: estTexte,
+            texte: estTexte ? texte : null,
+            octets: octets,
+            taille: octets.length,
+            extensionTexte: extensionTexte
+        };
+    }
+
+    // Encodage base64 des octets BRUTS, par tranches (pas de
+    // String.fromCharCode.apply sur un tableau entier : la pile saute au-delà
+    // de quelques dizaines de milliers d'octets).
+    async function encoderOctetsEnBase64(octets, onProgres) {
+        let binaire = '';
+        let tranches = 0;
+        for (let i = 0; i < octets.length; i += TRANCHE_BASE64) {
+            binaire += String.fromCharCode.apply(null, octets.subarray(i, i + TRANCHE_BASE64));
+            tranches++;
+            if (tranches % TRANCHES_PAR_RESPIRATION === 0) {
+                if (onProgres) onProgres(Math.min(i + TRANCHE_BASE64, octets.length), octets.length);
+                await new Promise(r => setTimeout(r, 0));
+            }
+        }
+        if (onProgres) onProgres(octets.length, octets.length);
+        return btoa(binaire);
+    }
+
+    function base64EnOctets(b64) {
+        const binaire = atob(normaliserBase64(b64));
+        const octets = new Uint8Array(binaire.length);
+        for (let i = 0; i < binaire.length; i++) octets[i] = binaire.charCodeAt(i) & 0xff;
+        return octets;
+    }
+
+    function normaliserBase64(b64) {
+        return String(b64 || '').replace(/\s+/g, '');
+    }
+
+    function formaterOctets(n) {
+        if (n < 1024) return `${n} octets`;
+        if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} ko (${n} octets)`;
+        return `${(n / (1024 * 1024)).toFixed(2)} Mo (${n} octets)`;
+    }
+
+    function extensionDe(chemin) {
+        const nom = String(chemin).toLowerCase().split('/').pop();
+        const point = nom.lastIndexOf('.');
+        return point <= 0 ? '' : nom.slice(point);
+    }
+
+    const TYPES_MIME = {
+        '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
+        '.webp': 'image/webp', '.bmp': 'image/bmp', '.ico': 'image/x-icon', '.svg': 'image/svg+xml',
+        '.tiff': 'image/tiff', '.tif': 'image/tiff',
+        '.pdf': 'application/pdf', '.zip': 'application/zip',
+        '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.flac': 'audio/flac',
+        '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime',
+        '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.otf': 'font/otf'
+    };
+
+    function typeMimeDe(chemin) {
+        return TYPES_MIME[extensionDe(chemin)] || 'application/octet-stream';
+    }
+
+    function estImage(chemin) {
+        return (typeMimeDe(chemin) || '').startsWith('image/');
+    }
+
+    // Signatures (magic numbers) des formats les plus courants : elles
+    // permettent de repérer immédiatement un fichier abîmé.
+    const SIGNATURES_CONNUES = {
+        '.png':  [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A],
+        '.gif':  [0x47, 0x49, 0x46, 0x38],
+        '.jpg':  [0xFF, 0xD8, 0xFF],
+        '.jpeg': [0xFF, 0xD8, 0xFF],
+        '.pdf':  [0x25, 0x50, 0x44, 0x46],
+        '.zip':  [0x50, 0x4B, 0x03, 0x04],
+        '.ico':  [0x00, 0x00, 0x01, 0x00],
+        '.woff': [0x77, 0x4F, 0x46, 0x46],
+        '.woff2':[0x77, 0x4F, 0x46, 0x32]
+    };
+
+    function hexDesPremiersOctets(octets, combien) {
+        return Array.from(octets.subarray(0, combien || 8))
+            .map(o => o.toString(16).toUpperCase().padStart(2, '0'))
+            .join(' ');
+    }
+
+    // Le symptôme exact du bug corrigé ici : un fichier envoyé en mode texte
+    // commence par EF BF BD (U+FFFD) là où il devrait avoir son octet ≥ 0x80.
+    function ressembleAUnEnvoiTexte(octets) {
+        return octets.length >= 3 && octets[0] === 0xEF && octets[1] === 0xBF && octets[2] === 0xBD;
+    }
+
+    function compterRemplacementsUnicode(octets) {
+        let n = 0;
+        for (let i = 0; i + 2 < octets.length; i++) {
+            if (octets[i] === 0xEF && octets[i + 1] === 0xBF && octets[i + 2] === 0xBD) n++;
+        }
+        return n;
+    }
+
+    // Renvoie un message d'erreur si la signature ne correspond pas au format
+    // attendu d'après l'extension, ou null (format inconnu, ou signature OK).
+    function erreurDeSignature(chemin, octets) {
+        const attendue = SIGNATURES_CONNUES[extensionDe(chemin)];
+        if (!attendue || octets.length < attendue.length) return null;
+        for (let i = 0; i < attendue.length; i++) {
+            if (octets[i] !== attendue[i]) {
+                const attenduHex = attendue.map(o => o.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+                return `signature ${hexDesPremiersOctets(octets, attendue.length)} au lieu de ${attenduHex}`;
+            }
+        }
+        return null;
+    }
+
+    // SHA-1 « blob » de Git, identique à celui que GitHub renvoie pour un
+    // fichier : sha1("blob <taille>\0" + octets).
+    async function calculerShaGitBlob(octets) {
+        try {
+            if (typeof crypto === 'undefined' || !crypto.subtle || !crypto.subtle.digest) return null;
+            const entete = new TextEncoder().encode("blob " + octets.length + "\u0000");
+            const total = new Uint8Array(entete.length + octets.length);
+            total.set(entete, 0);
+            total.set(octets, entete.length);
+            const empreinte = await crypto.subtle.digest('SHA-1', total);
+            return Array.from(new Uint8Array(empreinte))
+                .map(o => o.toString(16).padStart(2, '0')).join('');
+        } catch (_) {
+            return null;
+        }
+    }
+
+    // Aperçu + dimensions réelles d'une image. Ne rejette jamais : si l'aperçu
+    // est impossible (format non affichable, API indisponible), on renvoie null
+    // et la carte se contente du nom, de la taille et de la signature.
+    function dimensionsImage(octets, chemin) {
+        return new Promise((resolve) => {
+            try {
+                if (!estImage(chemin)) { resolve(null); return; }
+                if (!(window.URL && URL.createObjectURL)) { resolve(null); return; }
+
+                const blob = new Blob([octets], { type: typeMimeDe(chemin) });
+                const url = URL.createObjectURL(blob);
+                const img = new Image();
+                let fini = false;
+                const terminer = (valeur) => {
+                    if (fini) return;
+                    fini = true;
+                    if (!valeur) { try { URL.revokeObjectURL(url); } catch (_) {} }
+                    resolve(valeur);
+                };
+                img.onload = () => terminer({ largeur: img.naturalWidth, hauteur: img.naturalHeight, url: url });
+                img.onerror = () => terminer(null);
+                setTimeout(() => terminer(null), 5000);   // sécurité : jamais bloqué
+                img.src = url;
+            } catch (_) {
+                resolve(null);
+            }
+        });
+    }
+
+    async function recupererDonneesFichierRef(repo, chemin, ref) {
+        const url = `https://api.github.com/repos/${config.user}/${repo}/contents/${encoderCheminAPI(chemin)}?ref=${ref}`;
+        const rep = await fetch(url, { headers: headersGitHub(), cache: "no-store" });
+        if (!rep.ok) {
+            let detail = `${rep.status} ${rep.statusText}`;
+            try { const e = await rep.json(); if (e && e.message) detail = e.message; } catch (_) {}
+            throw new Error(detail);
+        }
+        const d = await rep.json();
+        const base64 = normaliserBase64(d.content || '');
+        const octets = base64EnOctets(base64);
+        return { base64: base64, octets: octets, taille: octets.length, sha: d.sha };
+    }
+
     function verifierConfig() {
         if(!config.user || !config.token) {
             afficherMessage("Erreur : Configure tes identifiants GitHub à l'étape 1 d'abord.", "error");
@@ -4619,9 +4868,26 @@
 
             const nom = (fichier.name || '').toLowerCase();
 
-            const lecteur = new FileReader();
-            lecteur.onload = async () => {
-                const contenu = lecteur.result;
+            // v1.42 : lecture en OCTETS, puis décodage UTF-8 strict.
+            lireFichierEnOctets(fichier).then(async (octets) => {
+                const analyse = analyserOctets(fichier.name, octets);
+
+                if (!analyse.estTexte) {
+                    reinitialiserCibleAlternative();
+                    afficherMessage(
+                        `⛔ FICHIER REFUSÉ — « ${fichier.name} » n'est pas du texte` +
+                        (analyse.extensionTexte
+                            ? " (son contenu n'est pas décodable en UTF-8)."
+                            : " (son extension est celle d'un format binaire).") + "\n\n" +
+                        "Cette zone envoie du texte : un binaire y serait irrémédiablement abîmé. " +
+                        "Passe par « 📁 Gérer les autres fichiers » : la carte d'un fichier binaire " +
+                        "l'envoie octet pour octet.\n\nLa zone de code n'a pas été modifiée.",
+                        "error"
+                    );
+                    return;
+                }
+
+                const contenu = analyse.texte;
 
                 // v1.41 : seul le fichier HTML habituel (index.html) se charge
                 // directement. Tout autre nom passe par un contrôle : mise à jour
@@ -4636,13 +4902,11 @@
                 reinitialiserCibleAlternative();
 
                 afficherMessage(
-                    `Fichier « ${fichier.name} » chargé dans la zone de code.\n\n` +
+                    `Fichier « ${fichier.name} » chargé dans la zone de code (${formaterOctets(analyse.taille)}).\n\n` +
                     "N'oublie pas le commentaire de version, puis « Mettre à jour sur GitHub ».",
                     "success"
                 );
-            };
-            lecteur.onerror = () => afficherMessage(`Impossible de lire le fichier « ${fichier.name} ».`, "error");
-            lecteur.readAsText(fichier);
+            }).catch(() => afficherMessage(`Impossible de lire le fichier « ${fichier.name} ».`, "error"));
         });
     }
 
@@ -4709,7 +4973,7 @@
     let autresFichiersRepo = null;
     let autresFichiersBranche = 'main';
     let autresFichiersChemins = [];      // tous les chemins déjà présents dans le dépôt
-    let contenuFichierDepose = null;     // contenu du fichier glissé-déposé, en attente
+    let contenuFichierDepose = null;     // { estTexte, texte, octets, nom, taille } du fichier déposé, en attente
 
     function fermerPageAutresFichiers() {
         document.getElementById('page-autres-fichiers').style.display = 'none';
@@ -4914,13 +5178,24 @@
             blocRepo.appendChild(carte);
         }
 
-        // Un fichier déposé par glisser-déposer remplit directement la zone.
+        // Un fichier déposé par glisser-déposer remplit directement la carte.
         let messageContenu = "";
-        if (contenuFichierDepose !== null) {
-            const zoneTexte = carte.querySelector('textarea');
-            if (zoneTexte) {
-                zoneTexte.value = contenuFichierDepose;
-                messageContenu = " Le contenu du fichier déposé y a été placé.";
+        if (contenuFichierDepose) {
+            if (estFichierTexte(chemin) && contenuFichierDepose.estTexte) {
+                const zoneTexte = carte.querySelector('textarea');
+                if (zoneTexte) {
+                    zoneTexte.value = contenuFichierDepose.texte;
+                    messageContenu = " Le contenu du fichier déposé y a été placé.";
+                }
+            } else if (!estFichierTexte(chemin) && carte.__carteBinaire) {
+                // Carte binaire : on lui passe les octets déjà lus, tels quels.
+                const refs = carte.__carteBinaire;
+                installerOctetsDansCarteBinaire(
+                    contenuFichierDepose.octets, contenuFichierDepose.nom, chemin,
+                    refs.etatCarte, refs.zone, refs.info, refs.statut);
+                messageContenu = ` Les ${formaterOctets(contenuFichierDepose.taille)} du fichier déposé y sont prêts à partir.`;
+            } else {
+                messageContenu = " ⚠️ Le fichier déposé n'est pas du texte décodable : il n'a pas été placé dans la zone.";
             }
         }
 
@@ -4974,20 +5249,30 @@
             const fichier = e.dataTransfer.files[0];
             if (!fichier) return;
 
-            const lecteur = new FileReader();
-            lecteur.onload = () => {
-                contenuFichierDepose = lecteur.result;
+            // v1.42 : lecture en OCTETS. Le fichier n'est considéré comme texte
+            // que s'il est décodable en UTF-8 strict et que son extension est
+            // textuelle ; sinon ses octets bruts sont gardés tels quels.
+            lireFichierEnOctets(fichier).then((octets) => {
+                const analyse = analyserOctets(fichier.name, octets);
+                contenuFichierDepose = {
+                    estTexte: analyse.estTexte,
+                    texte: analyse.texte,
+                    octets: octets,
+                    nom: fichier.name,
+                    taille: octets.length
+                };
+
                 const input = document.getElementById('input-nouveau-fichier');
                 if (input && !input.value.trim()) input.value = fichier.name;
+
                 afficherStatutNouveauFichier(
-                    `Fichier « ${fichier.name} » lu (${lecteur.result.length} caractères).\n\n` +
+                    `Fichier « ${fichier.name} » lu : ${formaterOctets(octets.length)}, traité comme ` +
+                    (analyse.estTexte ? "du TEXTE." : "un fichier BINAIRE (envoi octet pour octet).") + "\n\n" +
                     "Vérifie le chemin ci-dessus (ajoute un dossier devant le nom si le fichier ne va " +
                     "pas à la racine du dépôt), puis clique « Créer la carte ».",
                     "success");
-            };
-            lecteur.onerror = () => afficherStatutNouveauFichier(
-                `Impossible de lire le fichier « ${fichier.name} ».`, "error");
-            lecteur.readAsText(fichier);
+            }).catch(() => afficherStatutNouveauFichier(
+                `Impossible de lire le fichier « ${fichier.name} ».`, "error"));
         });
     }
 
@@ -5202,18 +5487,46 @@
         statutDiv.textContent = texte;
     }
 
+    // v1.42 : pour un binaire, « Voir » ouvre le fichier tel quel (aperçu
+    // image, PDF…) à partir des octets, sans jamais le convertir en texte.
     async function voirVersionFichier(repo, chemin, commitSha, dateStr, statutDiv) {
         try {
-            const contenu = await recupererContenuFichierRef(repo, chemin, commitSha);
-            const blob = new Blob([contenu], { type: 'text/plain;charset=utf-8' });
+            if (estFichierTexte(chemin)) {
+                const contenu = await recupererContenuFichierRef(repo, chemin, commitSha);
+                const blob = new Blob([contenu], { type: 'text/plain;charset=utf-8' });
+                window.open(URL.createObjectURL(blob), '_blank');
+                return;
+            }
+
+            const donnees = await recupererDonneesFichierRef(repo, chemin, commitSha);
+            const blob = new Blob([donnees.octets], { type: typeMimeDe(chemin) });
             const blobUrl = URL.createObjectURL(blob);
             window.open(blobUrl, '_blank');
+
+            const souci = erreurDeSignature(chemin, donnees.octets);
+            afficherStatutCarte(
+                statutDiv,
+                `Aperçu de la version du ${dateStr} — ${formaterOctets(donnees.taille)}, ` +
+                `premiers octets ${hexDesPremiersOctets(donnees.octets, 8)}.` +
+                (souci ? `\n\n⚠️ Signature inattendue (${souci}) : ce fichier est probablement abîmé.` : ''),
+                souci ? "error" : "success"
+            );
         } catch (error) {
             afficherStatutCarte(statutDiv, `Impossible d'afficher cette version : ${error.message}`, "error");
         }
     }
 
     async function copierVersionFichier(repo, chemin, commitSha, dateStr, bouton, statutDiv) {
+        if (!estFichierTexte(chemin)) {
+            afficherStatutCarte(
+                statutDiv,
+                `« ${chemin} » est un fichier binaire : il n'y a pas de texte à copier. ` +
+                "Utilise « Télécharger » pour récupérer le fichier tel quel, ou « Voir » pour l'ouvrir.",
+                "error"
+            );
+            return;
+        }
+
         const origine = bouton ? bouton.textContent : null;
         try {
             if (bouton) bouton.textContent = "Copie…";
@@ -5241,13 +5554,22 @@
         }
     }
 
+    // v1.42 : le téléchargement d'un binaire est reconstruit depuis le base64,
+    // avec son vrai type MIME — plus aucune conversion en texte.
     async function telechargerVersionFichier(repo, chemin, commitSha, dateStr, bouton, statutDiv) {
         const origine = bouton ? bouton.textContent : null;
         try {
             if (bouton) bouton.textContent = "Préparation…";
-            const contenu = await recupererContenuFichierRef(repo, chemin, commitSha);
 
-            const blob = new Blob([contenu], { type: 'text/plain;charset=utf-8' });
+            let blob;
+            if (estFichierTexte(chemin)) {
+                const contenu = await recupererContenuFichierRef(repo, chemin, commitSha);
+                blob = new Blob([contenu], { type: 'text/plain;charset=utf-8' });
+            } else {
+                const donnees = await recupererDonneesFichierRef(repo, chemin, commitSha);
+                blob = new Blob([donnees.octets], { type: typeMimeDe(chemin) });
+            }
+
             const blobUrl = URL.createObjectURL(blob);
             const lien = document.createElement('a');
             lien.href = blobUrl;
@@ -5276,10 +5598,36 @@
         );
         if (!okRestaurer) return;
 
+        const binaire = !estFichierTexte(chemin);
+
         try {
             afficherStatutCarte(statutDiv, "Restauration en cours...", "success");
 
-            const ancienContenu = await recupererContenuFichierRef(repo, chemin, commitSha);
+            // v1.42 : pour un binaire, on reprend le base64 de l'ancienne
+            // version tel quel — aucune conversion en texte, donc aucune perte.
+            let ancienContenu = null;      // texte (fichiers texte)
+            let ancienBase64 = null;       // base64 brut (binaires)
+            let ancienOctets = null;
+
+            if (binaire) {
+                const donnees = await recupererDonneesFichierRef(repo, chemin, commitSha);
+                ancienBase64 = donnees.base64;
+                ancienOctets = donnees.octets;
+
+                if (ressembleAUnEnvoiTexte(ancienOctets)) {
+                    afficherStatutCarte(
+                        statutDiv,
+                        `⛔ Restauration refusée : la version du ${dateStr} de « ${chemin} » est elle-même abîmée ` +
+                        `(elle commence par EF BF BD, ${compterRemplacementsUnicode(ancienOctets)} occurrences au total). ` +
+                        "Elle a été envoyée en mode texte par une version antérieure du Déployeur : la restaurer " +
+                        "ne ferait que recopier un fichier inutilisable. Renvoie le fichier d'origine depuis ton disque.",
+                        "error"
+                    );
+                    return;
+                }
+            } else {
+                ancienContenu = await recupererContenuFichierRef(repo, chemin, commitSha);
+            }
 
             const urlActuel = `https://api.github.com/repos/${config.user}/${repo}/contents/${encoderCheminAPI(chemin)}`;
             const reponseActuel = await fetch(urlActuel + `?ref=${encodeURIComponent(branche)}`, { headers: headersGitHub(), cache: "no-store" });
@@ -5291,7 +5639,7 @@
                 headers: headersGitHub(),
                 body: JSON.stringify({
                     message: `Restauration de la version du ${dateStr} de ${chemin} via Le Déployeur`,
-                    content: encoderBase64(ancienContenu),
+                    content: binaire ? ancienBase64 : encoderBase64(ancienContenu),
                     sha: fichierActuel.sha,
                     branch: branche
                 })
@@ -5308,17 +5656,31 @@
             const shaCommit = shaCommitComplet ? shaCommitComplet.substring(0, 7) : "inconnu";
 
             afficherStatutCarte(statutDiv, `Commit ${shaCommit} créé. Vérification de la version restaurée en ligne...`, "success");
-            const verif = await verifierContenuEnLigne(urlActuel, ancienContenu, shaCommitComplet, (n, total) => {
-                afficherStatutCarte(
-                    statutDiv,
-                    `Commit ${shaCommit} créé. GitHub n'a pas encore propagé le fichier — ` +
-                    `nouvelle vérification… (tentative ${n}/${total})`,
-                    "success"
-                );
-            });
+
+            const verif = binaire
+                ? await verifierContenuBinaireEnLigne(urlActuel, ancienBase64, chemin, shaCommitComplet, (n, total) => {
+                    afficherStatutCarte(
+                        statutDiv,
+                        `Commit ${shaCommit} créé. GitHub n'a pas encore propagé le fichier — ` +
+                        `nouvelle vérification… (tentative ${n}/${total})`,
+                        "success"
+                    );
+                })
+                : await verifierContenuEnLigne(urlActuel, ancienContenu, shaCommitComplet, (n, total) => {
+                    afficherStatutCarte(
+                        statutDiv,
+                        `Commit ${shaCommit} créé. GitHub n'a pas encore propagé le fichier — ` +
+                        `nouvelle vérification… (tentative ${n}/${total})`,
+                        "success"
+                    );
+                });
 
             if (verif.ok) {
-                afficherStatutCarte(statutDiv, `✅ Version du ${dateStr} restaurée et VÉRIFIÉE (commit ${shaCommit}).`, "success");
+                afficherStatutCarte(
+                    statutDiv,
+                    `✅ Version du ${dateStr} restaurée et VÉRIFIÉE (commit ${shaCommit})` +
+                    (binaire ? ` — ${formaterOctets(ancienOctets.length)} relus à l'identique.` : "."),
+                    "success");
                 chargerHistoriqueFichier(repo, chemin, branche, listDiv, statutDiv, btnHistorique);
             } else {
                 afficherStatutCarte(
@@ -5330,6 +5692,79 @@
         } catch (error) {
             afficherStatutCarte(statutDiv, `Erreur pendant la restauration : ${error.message}`, "error");
         }
+    }
+
+    // Vérification post-déploiement d'un BINAIRE : on compare la taille et le
+    // base64 relu (donc octet pour octet), et on contrôle la signature du
+    // fichier tel que GitHub le renvoie.
+    async function verifierContenuBinaireEnLigne(urlBase, base64Attendu, chemin, shaCommitComplet, onProgres) {
+        const refQuery = shaCommitComplet ? `?ref=${shaCommitComplet}` : "";
+        const attendu = normaliserBase64(base64Attendu);
+        const octetsAttendus = base64EnOctets(attendu);
+        const delais = [0, 1500, 2500, 4000, 6000];
+        let dernierDetail = "";
+
+        for (let i = 0; i < delais.length; i++) {
+            if (i > 0) {
+                if (onProgres) onProgres(i + 1, delais.length);
+                await new Promise(r => setTimeout(r, delais[i]));
+            }
+            try {
+                const relecture = await fetch(urlBase + refQuery, { headers: headersGitHub(), cache: "no-store" });
+                if (!relecture.ok) {
+                    dernierDetail = `Relecture impossible (${relecture.status} ${relecture.statusText}).`;
+                    continue;
+                }
+
+                const donnees = await relecture.json();
+                const base64Lu = normaliserBase64(donnees.content);
+                const octetsLus = base64EnOctets(base64Lu);
+
+                // Le symptôme du bug corrigé en v1.42 : fichier envoyé en texte.
+                if (ressembleAUnEnvoiTexte(octetsLus)) {
+                    return {
+                        ok: false,
+                        corrompu: true,
+                        detail:
+                            `Le fichier relu depuis GitHub commence par EF BF BD (caractère de remplacement U+FFFD) ` +
+                            `et en contient ${compterRemplacementsUnicode(octetsLus)} occurrences : il a été ENVOYÉ EN MODE TEXTE ` +
+                            `et il est irrécupérable en ligne. Premiers octets lus : ${hexDesPremiersOctets(octetsLus, 8)}.`
+                    };
+                }
+
+                if (base64Lu === attendu) {
+                    const souci = erreurDeSignature(chemin, octetsLus);
+                    if (souci) {
+                        return {
+                            ok: false,
+                            detail: `Le contenu en ligne est bien identique à ce qui a été envoyé (${octetsLus.length} octets), ` +
+                                    `mais sa signature ne correspond pas au format attendu (${souci}) : le fichier source ` +
+                                    "était déjà abîmé avant l'envoi."
+                        };
+                    }
+                    const shaLocal = await calculerShaGitBlob(octetsLus);
+                    const shaOk = !shaLocal || !donnees.sha || shaLocal === donnees.sha;
+                    return {
+                        ok: shaOk,
+                        taille: octetsLus.length,
+                        sha: donnees.sha,
+                        shaVerifie: !!(shaLocal && donnees.sha),
+                        detail: shaOk
+                            ? ""
+                            : `Taille identique (${octetsLus.length} octets) mais le SHA Git recalculé (${shaLocal}) ` +
+                              `ne correspond pas à celui annoncé par GitHub (${donnees.sha}).`
+                    };
+                }
+
+                dernierDetail =
+                    `Le fichier en ligne fait ${octetsLus.length} octets, alors que ${octetsAttendus.length} ont été ` +
+                    `envoyés (comparaison base64, octet par octet). Premiers octets en ligne : ` +
+                    `${hexDesPremiersOctets(octetsLus, 8)} ; attendus : ${hexDesPremiersOctets(octetsAttendus, 8)}.`;
+            } catch (e) {
+                dernierDetail = "Relecture impossible : " + e.message;
+            }
+        }
+        return { ok: false, detail: dernierDetail };
     }
 
     function construireElementCommitFichier(repo, chemin, branche, commit, estActuelle, listDiv, statutDiv, btn) {
@@ -5350,16 +5785,29 @@
                 ${estActuelle ? '' : '<button class="btn-small btn-restore">Restaurer</button>'}
             </div>`;
 
+        const estBinaire = !estFichierTexte(chemin);
+
         const btnVoir = item.querySelector('.btn-view');
-        attacherTooltip(btnVoir, `Affiche le contenu complet de cette version du ${dateStr} dans une fenêtre séparée, sans rien modifier ni republier — pratique pour relire ou comparer avant de restaurer.`);
+        attacherTooltip(btnVoir, estBinaire
+            ? `Ouvre cette version du ${dateStr} telle quelle dans un nouvel onglet (aperçu de l'image, du PDF…), reconstruite octet pour octet depuis GitHub. Rien n'est modifié ni republié.`
+            : `Affiche le contenu complet de cette version du ${dateStr} dans une fenêtre séparée, sans rien modifier ni republier — pratique pour relire ou comparer avant de restaurer.`);
+        btnVoir.textContent = estBinaire ? 'Aperçu' : 'Voir';
         btnVoir.addEventListener('click', () => voirVersionFichier(repo, chemin, commit.sha, dateStr, statutDiv));
 
+        // v1.42 : un binaire n'a pas de texte à copier — le bouton est désactivé.
         const btnCopier = item.querySelector('.btn-copy');
-        attacherTooltip(btnCopier, `Copie dans le presse-papier le contenu complet de cette version du ${dateStr}, par exemple pour le recoller dans la zone ci-dessus et le modifier avant de le redéployer.`);
-        btnCopier.addEventListener('click', (e) => copierVersionFichier(repo, chemin, commit.sha, dateStr, e.target, statutDiv));
+        if (estBinaire) {
+            btnCopier.disabled = true;
+            btnCopier.style.opacity = '0.45';
+            btnCopier.style.cursor = 'not-allowed';
+            attacherTooltip(btnCopier, `« ${chemin} » est un fichier binaire : il n'y a pas de texte à copier dans le presse-papier. Utilise « Télécharger » pour le récupérer tel quel, ou « Aperçu » pour l'ouvrir.`);
+        } else {
+            attacherTooltip(btnCopier, `Copie dans le presse-papier le contenu complet de cette version du ${dateStr}, par exemple pour le recoller dans la zone ci-dessus et le modifier avant de le redéployer.`);
+            btnCopier.addEventListener('click', (e) => copierVersionFichier(repo, chemin, commit.sha, dateStr, e.target, statutDiv));
+        }
 
         const btnTelecharger = item.querySelector('.btn-download');
-        attacherTooltip(btnTelecharger, `Télécharge cette version du ${dateStr} sous forme de fichier sur cet appareil, sans rien changer sur GitHub.`);
+        attacherTooltip(btnTelecharger, `Télécharge cette version du ${dateStr} sous forme de fichier sur cet appareil, sans rien changer sur GitHub. Un fichier binaire est reconstruit depuis ses octets, avec son vrai type (image, PDF…).`);
         btnTelecharger.addEventListener('click', (e) => telechargerVersionFichier(repo, chemin, commit.sha, dateStr, e.target, statutDiv));
 
         const btnRestore = item.querySelector('.btn-restore');
@@ -5527,23 +5975,26 @@
     }
 
     function construireCarteFichier(repo, chemin, branche, estNouveau) {
+        // v1.42 : un fichier binaire n'a ni zone de texte, ni « Edit », ni
+        // « Vider » — il se dépose tel quel et part en base64 de ses octets.
+        const binaire = !estFichierTexte(chemin);
+
         const card = document.createElement('div');
         card.className = 'card';
         card.style.marginBottom = '15px';
         card.dataset.chemin = chemin;
 
         const label = document.createElement('div');
-        label.textContent = chemin;
+        label.textContent = chemin + (binaire ? '  —  fichier binaire' : '');
         label.style.cssText = 'font-size:14px; color:#1d1d1f; font-weight:700; margin-bottom:5px;';
 
         const sousLabel = document.createElement('div');
         sousLabel.style.cssText = 'font-size:12px; color:#86868b; margin-bottom:10px;';
-        sousLabel.textContent = "Colle le nouveau contenu, ou glisse-dépose un fichier sur la zone — double-clic (ou double-tap) pour la vider.";
+        sousLabel.textContent = binaire
+            ? "Glisse le fichier sur la zone ci-dessous (ou choisis-le) : il sera envoyé octet pour octet, sans conversion en texte."
+            : "Colle le nouveau contenu, ou glisse-dépose un fichier sur la zone — double-clic (ou double-tap) pour la vider.";
 
         // v1.37 : carte d'un fichier qui n'existe pas encore sur GitHub.
-        // Elle fonctionne comme les autres — le déploiement sans SHA vaut
-        // création — mais l'historique et l'édition en ligne n'ont pas d'objet
-        // tant que le premier commit n'a pas été fait.
         let badgeNouveau = null;
         if (estNouveau) {
             card.style.border = '2px solid #34c759';
@@ -5554,12 +6005,16 @@
                 'background:#34c759; padding:2px 8px; border-radius:20px; margin-bottom:6px;';
             badgeNouveau.textContent = "NOUVEAU — n'existe pas encore sur GitHub";
 
-            sousLabel.textContent = "Ce fichier sera CRÉÉ dans le dépôt au premier « Mettre à jour sur GitHub ». " +
-                "Colle son contenu, ou glisse-dépose un fichier sur la zone — double-clic (ou double-tap) pour la vider.";
+            sousLabel.textContent = binaire
+                ? "Ce fichier sera CRÉÉ dans le dépôt au premier « Mettre à jour sur GitHub ». Glisse-le sur la zone ci-dessous (ou choisis-le) : il partira octet pour octet."
+                : "Ce fichier sera CRÉÉ dans le dépôt au premier « Mettre à jour sur GitHub ». " +
+                  "Colle son contenu, ou glisse-dépose un fichier sur la zone — double-clic (ou double-tap) pour la vider.";
         }
 
         const etatCarte = {
             nouveau: !!estNouveau,
+            estBinaire: binaire,
+            fichierBinaire: null,     // { octets, nom, taille } une fois un fichier choisi
             // Appelé après la création réussie : la carte redevient une carte ordinaire.
             marquerExistant() {
                 if (!this.nouveau) return;
@@ -5567,21 +6022,32 @@
                 card.style.border = '';
                 card.style.background = '';
                 if (badgeNouveau && badgeNouveau.parentNode) badgeNouveau.parentNode.removeChild(badgeNouveau);
-                sousLabel.textContent = "Colle le nouveau contenu, ou glisse-dépose un fichier sur la zone — double-clic (ou double-tap) pour la vider.";
+                sousLabel.textContent = binaire
+                    ? "Glisse le fichier sur la zone ci-dessous (ou choisis-le) : il sera envoyé octet pour octet, sans conversion en texte."
+                    : "Colle le nouveau contenu, ou glisse-dépose un fichier sur la zone — double-clic (ou double-tap) pour la vider.";
                 if (!autresFichiersChemins.includes(chemin)) autresFichiersChemins.push(chemin);
             }
         };
 
-        const textarea = document.createElement('textarea');
-        textarea.style.height = '140px';
-        textarea.placeholder = `Colle ici le nouveau contenu de ${chemin}…`;
+        // ————— Zone de contenu : texte ou binaire —————
+        let textarea = null;
+        let zoneBinaire = null;
+        let infoBinaire = null;
 
-        const btnVider = document.createElement('button');
-        btnVider.className = 'btn';
-        btnVider.style.cssText = 'background-color:#6e6e73; margin-top:5px;';
-        btnVider.textContent = 'Vider';
-        btnVider.addEventListener('click', () => viderZoneAvecConfirmationGenerique(textarea));
-        attacherTooltip(btnVider, "Vide (après confirmation) le contenu de cette zone. Ne touche à rien sur GitHub — seulement au texte affiché ici. Le double-clic (ou double-tap) sur la zone fait la même chose.");
+        if (!binaire) {
+            textarea = document.createElement('textarea');
+            textarea.style.height = '140px';
+            textarea.placeholder = `Colle ici le nouveau contenu de ${chemin}…`;
+        } else {
+            zoneBinaire = document.createElement('div');
+            zoneBinaire.className = 'zone-binaire';
+            zoneBinaire.innerHTML = `Dépose ici le fichier <strong>${echapperHtml(chemin.split('/').pop())}</strong>` +
+                `<br><span style="font-size:12px;">aucun fichier choisi pour l'instant</span>`;
+
+            infoBinaire = document.createElement('div');
+            infoBinaire.className = 'info-binaire';
+            infoBinaire.style.display = 'none';
+        }
 
         // v1.38 : zone de texte (et non plus champ d'une ligne) pour que le
         // commentaire collé garde ses retours à la ligne et sa mise en page.
@@ -5597,7 +6063,7 @@
         btnDeployer.className = 'btn';
         btnDeployer.style.cssText = 'background-color:#5856d6; margin-top:5px;';
         btnDeployer.textContent = 'Mettre à jour sur GitHub';
-        attacherTooltip(btnDeployer, `Envoie le contenu de la zone ci-dessus comme nouvelle version (un nouveau commit) du fichier « ${chemin} » dans le dépôt « ${repo} ». Le commentaire de version est obligatoire. Le déroulement complet de l'opération, et la marche à suivre en cas de problème, s'affichent juste en dessous de ce bouton.`);
+        attacherTooltip(btnDeployer, `Envoie le contenu ci-dessus comme nouvelle version (un nouveau commit) du fichier « ${chemin} » dans le dépôt « ${repo} ». Le commentaire de version est obligatoire.` + (binaire ? " Ce fichier étant binaire, il part en base64 de ses octets bruts, et la vérification compare la taille, le base64 relu et le SHA Git." : "") + " Le déroulement complet de l'opération, et la marche à suivre en cas de problème, s'affichent juste en dessous de ce bouton.");
 
         const deploiementStatut = document.createElement('div');
         deploiementStatut.className = 'status';
@@ -5608,10 +6074,18 @@
         card.appendChild(label);
         if (badgeNouveau) card.appendChild(badgeNouveau);
         card.appendChild(sousLabel);
-        card.appendChild(textarea);
-        card.appendChild(btnVider);
 
-        if (estFichierTexte(chemin)) {
+        if (!binaire) {
+            card.appendChild(textarea);
+
+            const btnVider = document.createElement('button');
+            btnVider.className = 'btn';
+            btnVider.style.cssText = 'background-color:#6e6e73; margin-top:5px;';
+            btnVider.textContent = 'Vider';
+            btnVider.addEventListener('click', () => viderZoneAvecConfirmationGenerique(textarea));
+            attacherTooltip(btnVider, "Vide (après confirmation) le contenu de cette zone. Ne touche à rien sur GitHub — seulement au texte affiché ici. Le double-clic (ou double-tap) sur la zone fait la même chose.");
+            card.appendChild(btnVider);
+
             const btnEdit = document.createElement('button');
             btnEdit.className = 'btn';
             btnEdit.style.cssText = 'background-color:#0071e3; margin-top:5px;';
@@ -5619,6 +6093,40 @@
             btnEdit.addEventListener('click', () => ouvrirEditionPleinePage(textarea, chemin, repo, branche, etatCarte));
             attacherTooltip(btnEdit, "Ouvre en plein écran la dernière version de ce fichier telle qu'elle est sur GitHub, pour l'éditer plus confortablement (pratique sur iPhone). Tu pourras la vider ou coller le contenu du presse-papier, puis choisir en revenant si ce texte remplace le contenu de la zone ci-dessous. Rien n'est envoyé sur GitHub tant que tu ne cliques pas sur « Mettre à jour sur GitHub ».");
             card.appendChild(btnEdit);
+        } else {
+            card.appendChild(zoneBinaire);
+            card.appendChild(infoBinaire);
+
+            const inputFichier = document.createElement('input');
+            inputFichier.type = 'file';
+            inputFichier.style.display = 'none';
+
+            const btnChoisir = document.createElement('button');
+            btnChoisir.className = 'btn';
+            btnChoisir.style.cssText = 'background-color:#6e6e73; margin-top:5px;';
+            btnChoisir.textContent = '📂 Choisir le fichier…';
+            attacherTooltip(btnChoisir, `Ouvre le sélecteur de fichiers de l'appareil pour désigner le fichier à envoyer comme nouvelle version de « ${chemin} ». Sur iPhone, c'est le seul moyen : le glisser-déposer n'y existe pas.`);
+            btnChoisir.addEventListener('click', () => inputFichier.click());
+
+            inputFichier.addEventListener('change', () => {
+                const fichier = inputFichier.files && inputFichier.files[0];
+                if (fichier) chargerFichierBinaireDansCarte(fichier, chemin, etatCarte, zoneBinaire, infoBinaire, deploiementStatut);
+                inputFichier.value = '';
+            });
+
+            card.appendChild(inputFichier);
+            card.appendChild(btnChoisir);
+
+            activerDepotBinaire(zoneBinaire, chemin, etatCarte, infoBinaire, deploiementStatut);
+
+            // Repères pour remplir la carte depuis l'extérieur (fichier déposé
+            // sur le bloc « ➕ Ajouter un fichier au dépôt »).
+            card.__carteBinaire = {
+                etatCarte: etatCarte,
+                zone: zoneBinaire,
+                info: infoBinaire,
+                statut: deploiementStatut
+            };
         }
 
         const btnHistorique = document.createElement('button');
@@ -5644,13 +6152,129 @@
         card.appendChild(btnDeployer);
         card.appendChild(deploiementStatut);
 
-        activerGlisserDeposerGenerique(textarea);
-        activerDoubleClicViderGenerique(textarea);
+        if (!binaire) {
+            activerGlisserDeposerGenerique(textarea, chemin);
+            activerDoubleClicViderGenerique(textarea);
+        } else {
+            // Références utilisées par « ➕ Ajouter un fichier au dépôt » pour
+            // installer dans la carte le fichier déjà déposé sur le bloc d'ajout.
+            card.__carteBinaire = {
+                etatCarte: etatCarte,
+                zone: zoneBinaire,
+                info: infoBinaire,
+                statut: deploiementStatut
+            };
+        }
 
         return card;
     }
 
-    function activerGlisserDeposerGenerique(zone) {
+    // ————— v1.42 : dépôt d'un fichier binaire sur une carte —————
+
+    function activerDepotBinaire(zone, chemin, etatCarte, infoBinaire, statutDiv) {
+        const contientFichier = (e) => e.dataTransfer && e.dataTransfer.types &&
+            Array.prototype.indexOf.call(e.dataTransfer.types, 'Files') !== -1;
+
+        zone.addEventListener('dragenter', (e) => {
+            if (!contientFichier(e)) return;
+            e.preventDefault();
+            zone.classList.add('zone-depot-actif');
+        });
+        zone.addEventListener('dragover', (e) => {
+            if (!contientFichier(e)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            zone.classList.add('zone-depot-actif');
+        });
+        zone.addEventListener('dragleave', (e) => {
+            if (e.target === zone) zone.classList.remove('zone-depot-actif');
+        });
+        zone.addEventListener('drop', (e) => {
+            if (!contientFichier(e)) return;
+            e.preventDefault();
+            zone.classList.remove('zone-depot-actif');
+            const fichier = e.dataTransfer.files[0];
+            if (fichier) chargerFichierBinaireDansCarte(fichier, chemin, etatCarte, zone, infoBinaire, statutDiv);
+        });
+    }
+
+    async function chargerFichierBinaireDansCarte(fichier, chemin, etatCarte, zone, infoBinaire, statutDiv) {
+        let octets;
+        try {
+            octets = await lireFichierEnOctets(fichier);
+        } catch (e) {
+            afficherStatutCarte(statutDiv, `Impossible de lire « ${fichier.name} » : ${e.message}`, "error");
+            return;
+        }
+        await installerOctetsDansCarteBinaire(octets, fichier.name, chemin, etatCarte, zone, infoBinaire, statutDiv);
+    }
+
+    // Octets déjà lus (dépôt sur la carte, ou fichier déposé sur le bloc
+    // « ➕ Ajouter un fichier ») : contrôle, affichage, aperçu.
+    async function installerOctetsDansCarteBinaire(octets, nomFichier, chemin, etatCarte, zone, infoBinaire, statutDiv) {
+        const fichier = { name: nomFichier };
+
+        // Garde-fou : un fichier source déjà détruit par un envoi en mode texte
+        // (il commence par EF BF BD) ne doit surtout pas être renvoyé tel quel.
+        if (ressembleAUnEnvoiTexte(octets)) {
+            etatCarte.fichierBinaire = null;
+            infoBinaire.style.display = 'none';
+            afficherStatutCarte(
+                statutDiv,
+                `⛔ « ${fichier.name} » est DÉJÀ abîmé : il commence par EF BF BD (caractère de remplacement U+FFFD) ` +
+                `et en contient ${compterRemplacementsUnicode(octets)} occurrences.\n\n` +
+                "C'est la trace d'un fichier téléchargé après un envoi en mode texte. L'envoyer ne ferait que " +
+                "recopier un fichier inutilisable : reprends le fichier d'origine sur ton disque.",
+                "error"
+            );
+            return;
+        }
+
+        etatCarte.fichierBinaire = { octets: octets, nom: fichier.name, taille: octets.length };
+
+        zone.innerHTML = `Fichier prêt : <strong>${echapperHtml(fichier.name)}</strong>` +
+            `<br><span style="font-size:12px;">dépose un autre fichier pour le remplacer</span>`;
+
+        const souci = erreurDeSignature(chemin, octets);
+        const nomAttendu = chemin.split('/').pop();
+        const lignes = [];
+        lignes.push(`<div><strong>${echapperHtml(fichier.name)}</strong> — ${formaterOctets(octets.length)}</div>`);
+        lignes.push(`<div>Premiers octets : <code>${hexDesPremiersOctets(octets, 8)}</code></div>`);
+        if (fichier.name !== nomAttendu) {
+            lignes.push(`<div style="color:#b26a00;">⚠️ Il sera enregistré sous « ${echapperHtml(chemin)} », ` +
+                        `et non sous « ${echapperHtml(fichier.name)} ».</div>`);
+        }
+        if (souci) {
+            lignes.push(`<div style="color:#c62828;">⚠️ Signature inattendue pour ce format (${echapperHtml(souci)}).</div>`);
+        }
+
+        infoBinaire.innerHTML = lignes.join('');
+        infoBinaire.style.display = 'block';
+
+        // Aperçu miniature + dimensions réelles pour une image.
+        const dims = await dimensionsImage(octets, chemin);
+        if (dims) {
+            const img = document.createElement('img');
+            img.src = dims.url;
+            img.className = 'apercu-binaire';
+            img.alt = fichier.name;
+            const legende = document.createElement('div');
+            legende.style.cssText = 'font-size:12px; color:#86868b; margin-top:4px;';
+            legende.textContent = `Dimensions réelles : ${dims.largeur} × ${dims.hauteur} pixels`;
+            infoBinaire.appendChild(img);
+            infoBinaire.appendChild(legende);
+        }
+
+        afficherStatutCarte(
+            statutDiv,
+            `Fichier « ${fichier.name} » prêt (${formaterOctets(octets.length)})` +
+            (dims ? `, ${dims.largeur} × ${dims.hauteur} pixels` : '') + ".\n\n" +
+            "Il sera envoyé octet pour octet. Saisis le commentaire de version, puis clique « Mettre à jour sur GitHub ».",
+            souci ? "error" : "success"
+        );
+    }
+
+    function activerGlisserDeposerGenerique(zone, cheminCarte) {
         const contientFichier = (e) => e.dataTransfer && e.dataTransfer.types &&
             Array.prototype.indexOf.call(e.dataTransfer.types, 'Files') !== -1;
 
@@ -5676,16 +6300,35 @@
             const fichier = e.dataTransfer.files[0];
             if (!fichier) return;
 
-            const lecteur = new FileReader();
-            lecteur.onload = () => {
-                zone.value = lecteur.result;
+            // v1.42 : lecture en OCTETS, puis décodage UTF-8 strict. Un fichier
+            // non décodable (ou d'extension binaire) n'a rien à faire dans une
+            // zone de texte : il serait détruit à l'envoi.
+            lireFichierEnOctets(fichier).then((octets) => {
+                const analyse = analyserOctets(fichier.name, octets);
+                if (!analyse.estTexte) {
+                    afficherMessage(
+                        `⛔ « ${fichier.name} » n'est pas un fichier texte` +
+                        (analyse.extensionTexte
+                            ? " (son contenu n'est pas décodable en UTF-8)."
+                            : " (son extension est celle d'un format binaire).") + "\n\n" +
+                        "Cette zone envoie du texte : un binaire y serait irrémédiablement abîmé. " +
+                        "Pour une image, une police ou une archive, utilise la carte du fichier binaire " +
+                        "correspondant (ou crée-la avec « ➕ Ajouter un fichier au dépôt »). " +
+                        "La zone n'a pas été modifiée.",
+                        "error"
+                    );
+                    return;
+                }
+                zone.value = analyse.texte;
                 afficherMessage(
-                    `Fichier « ${fichier.name} » chargé dans la zone.\n\nN'oublie pas le commentaire de version, puis « Mettre à jour sur GitHub ».`,
+                    `Fichier « ${fichier.name} » chargé dans la zone (${formaterOctets(analyse.taille)}).` +
+                    (cheminCarte && fichier.name !== String(cheminCarte).split('/').pop()
+                        ? `\n\n⚠️ Il sera enregistré sous « ${cheminCarte} », et non sous « ${fichier.name} ».`
+                        : "") +
+                    "\n\nN'oublie pas le commentaire de version, puis « Mettre à jour sur GitHub ».",
                     "success"
                 );
-            };
-            lecteur.onerror = () => afficherMessage(`Impossible de lire le fichier « ${fichier.name} ».`, "error");
-            lecteur.readAsText(fichier);
+            }).catch(() => afficherMessage(`Impossible de lire le fichier « ${fichier.name} ».`, "error"));
         });
     }
 
@@ -5938,7 +6581,9 @@
 
     async function deployerFichierGenerique(repo, chemin, branche, textarea, inputCommentaire, bouton, statutDiv, etatCarte) {
         const creationAttendue = !!(etatCarte && etatCarte.nouveau);
-        const code = textarea.value;
+        const binaire = !!(etatCarte && etatCarte.estBinaire);
+        const fichierBinaire = binaire ? (etatCarte.fichierBinaire || null) : null;
+        const code = binaire ? null : textarea.value;
         const commentaire = inputCommentaire.value.trim();
         const journal = creerJournalDeploiement(statutDiv);
 
@@ -5957,7 +6602,20 @@
             return;
         }
 
-        if (!code.trim()) {
+        if (binaire && !fichierBinaire) {
+            afficherMessage(`Erreur : aucun fichier n'a été choisi pour « ${chemin} ».`, "error");
+            journal.majEtape(iControles, "Contrôles préalables : aucun fichier binaire choisi.", "ko");
+            journal.terminer("error", TITRE_PROBLEME,
+                "Cause : « " + chemin + " » est un fichier binaire (image, police, archive, PDF…). " +
+                "Il ne se colle pas dans une zone de texte : il faut désigner le fichier lui-même, " +
+                "dont les octets seront envoyés tels quels.\n\n" +
+                "➡️ Marche à suivre : glisse le fichier sur la zone pointillée de cette carte, ou clique " +
+                "« 📂 Choisir le fichier… », vérifie le nom, la taille et l'aperçu affichés, puis reclique " +
+                "« Mettre à jour sur GitHub ».");
+            return;
+        }
+
+        if (!binaire && !code.trim()) {
             afficherMessage(`Erreur : la zone de texte pour « ${chemin} » est vide.`, "error");
             journal.majEtape(iControles, "Contrôles préalables : la zone de contenu est vide.", "ko");
             journal.terminer("error", TITRE_PROBLEME,
@@ -6010,14 +6668,23 @@
         const iLecture = journal.etape(`Lecture de la version actuelle de « ${chemin} » sur GitHub (branche ${branche})…`, "encours");
 
         let sha = null;
-        let contenuActuel = null;
+        let contenuActuel = null;        // texte en ligne (fichiers texte)
+        let base64Actuel = null;         // base64 en ligne (binaires)
+        let octetsActuels = null;
         let lectureImpossible = null;
         try {
             const reponseCheck = await fetch(url + `?ref=${encodeURIComponent(branche)}`, { headers: headersGitHub(), cache: "no-store" });
             if (reponseCheck.ok) {
                 const donneesFile = await reponseCheck.json();
                 sha = donneesFile.sha;
-                try { contenuActuel = decoderBase64(donneesFile.content); } catch (_) { contenuActuel = null; }
+                if (binaire) {
+                    try {
+                        base64Actuel = normaliserBase64(donneesFile.content);
+                        octetsActuels = base64EnOctets(base64Actuel);
+                    } catch (_) { base64Actuel = null; octetsActuels = null; }
+                } else {
+                    try { contenuActuel = decoderBase64(donneesFile.content); } catch (_) { contenuActuel = null; }
+                }
             } else {
                 lectureImpossible = `${reponseCheck.status} ${reponseCheck.statusText}`;
             }
@@ -6028,8 +6695,20 @@
         if (sha) {
             journal.majEtape(iLecture,
                 `Version actuelle lue (identifiant ${String(sha).substring(0, 7)}` +
-                (contenuActuel !== null ? `, ${contenuActuel.length} caractères en ligne).` : `).`),
+                (binaire
+                    ? (octetsActuels !== null ? `, ${formaterOctets(octetsActuels.length)} en ligne).` : `).`)
+                    : (contenuActuel !== null ? `, ${contenuActuel.length} caractères en ligne).` : `).`)),
                 "ok");
+
+            // Si le fichier EN LIGNE porte déjà la marque d'un envoi en mode
+            // texte, on le dit : c'est précisément ce que cette version répare.
+            if (binaire && octetsActuels && ressembleAUnEnvoiTexte(octetsActuels)) {
+                journal.etape(
+                    `La version actuellement en ligne de « ${chemin} » est abîmée : elle commence par EF BF BD et ` +
+                    `contient ${compterRemplacementsUnicode(octetsActuels)} caractères de remplacement U+FFFD. ` +
+                    "Elle avait été envoyée en mode texte ; l'envoi qui suit va la remplacer par les octets d'origine.",
+                    "attention");
+            }
         } else if (creationAttendue) {
             journal.majEtape(iLecture,
                 `« ${chemin} » est bien absent du dépôt, comme prévu — l'envoi va donc créer le fichier.`,
@@ -6040,8 +6719,86 @@
                 "attention");
         }
 
+        // ————— v1.42 : préparation du contenu à envoyer —————
+        // Pour un binaire : base64 des OCTETS BRUTS, encodés par tranches, avec
+        // décompte de progression. Aucune chaîne de caractères intermédiaire.
+        let contenuEnvoye = null;    // base64 prêt pour l'API
+        if (binaire) {
+            const octets = fichierBinaire.octets;
+
+            // Garde-fou n° 1 : refus si le contenu à envoyer contient des U+FFFD.
+            const remplacements = compterRemplacementsUnicode(octets);
+            if (remplacements > 0) {
+                afficherMessage(`⛔ Envoi refusé pour « ${chemin} » : le fichier contient des caractères de remplacement U+FFFD.`, "error");
+                journal.etape(
+                    `Contrôle des octets : ${remplacements} occurrence(s) de EF BF BD (U+FFFD) dans un fichier binaire.`,
+                    "ko");
+                journal.terminer("error", TITRE_PROBLEME,
+                    "Cause : un fichier binaire sain ne contient pas la séquence EF BF BD, qui est le caractère " +
+                    "de remplacement U+FFFD. Sa présence signifie que ce fichier a déjà été abîmé par une " +
+                    "conversion en texte — typiquement parce qu'il a été téléchargé depuis un dépôt où il avait " +
+                    "été envoyé en mode texte.\n\n" +
+                    "➡️ Marche à suivre : reprends le fichier D'ORIGINE (celui qui n'est jamais passé par " +
+                    "le dépôt), dépose-le sur cette carte — le nombre d'octets et l'aperçu doivent être corrects — " +
+                    "puis renvoie. Rien n'a été écrit sur GitHub.");
+                bouton.disabled = false;
+                bouton.textContent = origineBouton;
+                return;
+            }
+
+            // Garde-fou n° 2 : signature du format (PNG, JPEG, PDF…).
+            const soucisSignature = erreurDeSignature(chemin, octets);
+            if (soucisSignature) {
+                afficherMessage(`⛔ Envoi refusé pour « ${chemin} » : ${soucisSignature}.`, "error");
+                journal.etape(`Contrôle de la signature du fichier : ${soucisSignature}.`, "ko");
+                journal.terminer("error", TITRE_PROBLEME,
+                    "Cause : les premiers octets du fichier ne correspondent pas au format annoncé par son " +
+                    "extension. Le fichier est soit abîmé, soit d'un autre format que celui attendu ; " +
+                    "l'envoyer mettrait un fichier inutilisable dans le dépôt.\n\n" +
+                    "➡️ Marche à suivre : vérifie le fichier sur ton disque (ouvre-le pour confirmer qu'il " +
+                    "s'affiche normalement), puis redépose-le sur cette carte. Rien n'a été écrit sur GitHub.");
+                bouton.disabled = false;
+                bouton.textContent = origineBouton;
+                return;
+            }
+
+            const iEncodage = journal.etape(`Encodage des ${formaterOctets(octets.length)} en base64…`, "encours");
+            bouton.textContent = "Encodage…";
+            contenuEnvoye = await encoderOctetsEnBase64(octets, (faits, total) => {
+                const pct = total ? Math.round(faits * 100 / total) : 100;
+                bouton.textContent = `Encodage ${pct} %…`;
+                journal.majEtape(iEncodage,
+                    `Encodage en base64 : ${faits} octets traités sur ${total} (${total - faits} restants, ${pct} %)…`,
+                    "encours");
+            });
+            const shaPrevu = await calculerShaGitBlob(octets);
+            journal.majEtape(iEncodage,
+                `Encodage terminé : ${octets.length} octets → ${contenuEnvoye.length} caractères base64` +
+                (shaPrevu ? `, SHA Git attendu ${shaPrevu.substring(0, 7)}.` : "."),
+                "ok");
+        } else {
+            contenuEnvoye = encoderBase64(code);
+        }
+
         const iComparaison = journal.etape("Comparaison du contenu envoyé avec celui en ligne…", "encours");
-        if (contenuActuel !== null && contenuActuel === code) {
+
+        if (binaire && base64Actuel !== null && base64Actuel === contenuEnvoye) {
+            afficherMessage(`ℹ️ RIEN À DÉPLOYER pour « ${chemin} » — le fichier est déjà en ligne à l'identique.`, "error");
+            journal.majEtape(iComparaison,
+                `Comparaison : les ${formaterOctets(fichierBinaire.taille)} envoyés sont identiques, octet pour octet, à la version en ligne.`,
+                "info");
+            journal.terminer("error", TITRE_PROBLEME,
+                "Cause : le fichier choisi est rigoureusement le même que celui déjà présent sur GitHub " +
+                "(même base64, donc mêmes octets). L'API GitHub ne créerait aucun commit et ton commentaire " +
+                "ne serait pas enregistré.\n\n" +
+                "➡️ Marche à suivre : si tu voulais envoyer une version modifiée, vérifie que tu as bien " +
+                "désigné le bon fichier (son nom, sa taille et son aperçu sont affichés sur la carte).");
+            bouton.disabled = false;
+            bouton.textContent = origineBouton;
+            return;
+        }
+
+        if (!binaire && contenuActuel !== null && contenuActuel === code) {
             afficherMessage(`ℹ️ RIEN À DÉPLOYER pour « ${chemin} » — le contenu envoyé est identique à celui déjà en ligne.`, "error");
             journal.majEtape(iComparaison, "Comparaison : contenu strictement identique à la version en ligne.", "info");
             journal.terminer("error", TITRE_PROBLEME,
@@ -6056,15 +6813,25 @@
             bouton.textContent = origineBouton;
             return;
         }
-        journal.majEtape(iComparaison,
-            contenuActuel !== null
-                ? `Comparaison : le contenu diffère (${contenuActuel.length} caractères en ligne → ${code.length} envoyés).`
-                : (creationAttendue && !sha
-                    ? `Aucune version en ligne à comparer (fichier à créer) : ${code.length} caractères vont être envoyés.`
-                    : `Comparaison impossible (contenu actuel illisible) : l'envoi de ${code.length} caractères est tenté.`),
-            contenuActuel === null && !(creationAttendue && !sha) ? "attention" : "ok");
+        if (binaire) {
+            journal.majEtape(iComparaison,
+                octetsActuels !== null
+                    ? `Comparaison : le fichier diffère (${octetsActuels.length} octets en ligne → ${fichierBinaire.taille} envoyés).`
+                    : (creationAttendue && !sha
+                        ? `Aucune version en ligne à comparer (fichier à créer) : ${formaterOctets(fichierBinaire.taille)} vont être envoyés.`
+                        : `Comparaison impossible (version en ligne illisible) : l'envoi de ${formaterOctets(fichierBinaire.taille)} est tenté.`),
+                octetsActuels === null && !(creationAttendue && !sha) ? "attention" : "ok");
+        } else {
+            journal.majEtape(iComparaison,
+                contenuActuel !== null
+                    ? `Comparaison : le contenu diffère (${contenuActuel.length} caractères en ligne → ${code.length} envoyés).`
+                    : (creationAttendue && !sha
+                        ? `Aucune version en ligne à comparer (fichier à créer) : ${code.length} caractères vont être envoyés.`
+                        : `Comparaison impossible (contenu actuel illisible) : l'envoi de ${code.length} caractères est tenté.`),
+                contenuActuel === null && !(creationAttendue && !sha) ? "attention" : "ok");
+        }
 
-        const bodyPayload = { message: commentaire, content: encoderBase64(code), branch: branche };
+        const bodyPayload = { message: commentaire, content: contenuEnvoye, branch: branche };
         if (sha) bodyPayload.sha = sha;
 
         const iEnvoi = journal.etape(`Envoi du commit « ${commentaire} » vers ${config.user}/${repo}…`, "encours");
@@ -6109,13 +6876,42 @@
             }
 
             bouton.textContent = "Vérification…";
-            const iVerif = journal.etape("Relecture du contenu réellement en ligne pour vérification…", "encours");
-            const verif = await verifierContenuEnLigne(url, code, shaCommitComplet, (n, total) => {
+            const iVerif = journal.etape(
+                binaire
+                    ? "Relecture du fichier réellement en ligne (taille, base64 et SHA Git)…"
+                    : "Relecture du contenu réellement en ligne pour vérification…",
+                "encours");
+
+            const surProgresVerif = (n, total) => {
                 bouton.textContent = `Vérif. ${n}/${total}…`;
                 journal.majEtape(iVerif,
                     `Relecture du contenu en ligne : GitHub n'a pas encore propagé le fichier, nouvelle tentative ${n}/${total}…`,
                     "encours");
-            });
+            };
+
+            const verif = binaire
+                ? await verifierContenuBinaireEnLigne(url, contenuEnvoye, chemin, shaCommitComplet, surProgresVerif)
+                : await verifierContenuEnLigne(url, code, shaCommitComplet, surProgresVerif);
+
+            // v1.42 : symptôme sans ambiguïté d'un envoi en mode texte.
+            if (verif.corrompu) {
+                afficherMessage(
+                    `⛔ « ${chemin} » a été envoyé EN MODE TEXTE et est arrivé corrompu dans le dépôt.`,
+                    "error");
+                journal.majEtape(iVerif, `Relecture : ${verif.detail}`, "ko");
+                journal.terminer("error", TITRE_PROBLEME,
+                    "Cause : le fichier relu depuis GitHub commence par EF BF BD (U+FFFD). Chaque octet ≥ 0x80 " +
+                    "a été remplacé et les 0x0D ont disparu : c'est exactement ce que produit une lecture en " +
+                    "texte suivie d'un ré-encodage UTF-8. Le fichier en ligne est inutilisable.\n\n" +
+                    verif.detail + "\n\n" +
+                    "➡️ Marche à suivre : cette version du Déployeur envoie les binaires en octets bruts, donc " +
+                    "ce message ne devrait plus apparaître. S'il apparaît malgré tout, vérifie que tu utilises " +
+                    "bien la dernière version de la page (numéro de version en haut, puis recharge en vidant le " +
+                    "cache), et renvoie le fichier d'origine depuis ton disque.");
+                bouton.disabled = false;
+                bouton.textContent = origineBouton;
+                return;
+            }
 
             if (verif.ok) {
                 const creationEffective = creationAttendue && !sha;
@@ -6124,13 +6920,22 @@
                         ? `✅ « ${chemin} » CRÉÉ et VÉRIFIÉ (commit ${shaCommit}) dans « ${repo} ».`
                         : `✅ « ${chemin} » mis à jour et VÉRIFIÉ (commit ${shaCommit}) dans « ${repo} ».`,
                     "success");
-                journal.majEtape(iVerif, "Relecture : le contenu en ligne correspond exactement à ce qui a été envoyé.", "ok");
+                journal.majEtape(iVerif,
+                    binaire
+                        ? `Relecture : ${verif.taille} octets en ligne, base64 identique à l'envoi` +
+                          (verif.shaVerifie
+                            ? `, SHA Git recalculé identique à celui de GitHub (${String(verif.sha).substring(0, 7)}).`
+                            : ".")
+                        : "Relecture : le contenu en ligne correspond exactement à ce qui a été envoyé.",
+                    "ok");
                 journal.terminer("success", TITRE_SUITE,
                     (creationEffective ? "✅ Création réussie et vérifiée. Le fichier « " : "✅ Mise à jour réussie et vérifiée. Le fichier « ") +
                     chemin + " » du dépôt « " + repo +
                     " » (branche " + branche + ") contient maintenant exactement ce que tu as envoyé, " +
                     "sous le commit " + shaCommit + " — commentaire : « " + commentaire + " ».\n\n" +
-                    "➡️ La zone de texte et le champ de commentaire ont été vidés, c'est normal : le " +
+                    (binaire
+                        ? "➡️ Le champ de commentaire a été vidé, c'est normal : le "
+                        : "➡️ La zone de texte et le champ de commentaire ont été vidés, c'est normal : le ") +
                     "travail est enregistré sur GitHub. Si le dépôt est publié via GitHub Pages, le " +
                     "changement est visible en ligne d'ici 30 à 60 secondes. Le bouton « Charger " +
                     "l'historique » de cette carte permet à tout moment de revoir, télécharger ou " +
@@ -6142,7 +6947,9 @@
                           "sont devenus actifs)."
                         : ""));
                 if (etatCarte && etatCarte.marquerExistant) etatCarte.marquerExistant();
-                textarea.value = "";
+                // Le fichier binaire choisi reste affiché sur la carte (nom,
+                // taille, aperçu) : il correspond désormais à ce qui est en ligne.
+                if (!binaire) textarea.value = "";
                 inputCommentaire.value = "";
                 ajusterHauteurCommentaire(inputCommentaire);
                 bouton.textContent = "Mis à jour ✓";
@@ -6197,6 +7004,7 @@
     //  liste. Ajouter ici une entrée à CHAQUE nouvelle version.
     // =====================================================================
     const HISTORIQUE_VERSIONS = [
+        ["v1.42", "Correction d'un bug destructeur : les fichiers binaires (images, polices, PDF, archives) étaient lus en texte puis ré-encodés en UTF-8 avant le commit, ce qui remplaçait chaque octet ≥ 0x80 par EF BF BD et supprimait les 0x0D — la signature PNG était détruite. Désormais tout fichier déposé est lu en octets (ArrayBuffer), n'est traité comme du texte que s'il est décodable en UTF-8 strict ET d'extension textuelle, et part en base64 de ses octets bruts encodés par tranches de 8 ko avec décompte de progression. Les cartes de fichiers binaires n'ont plus de zone de texte ni de bouton Edit/Vider mais un dépôt de fichier avec nom, taille, signature et aperçu dimensionné ; la vérification après commit compare la taille, le base64 relu et le SHA Git, refuse un contenu contenant des U+FFFD ou de signature invalide, et signale explicitement un fichier arrivé en mode texte ; l'historique d'un binaire propose Aperçu et Télécharger (reconstruits depuis le base64), Copier étant désactivé."],
         ["v1.41", "La zone HTML de l'étape 3 n'accepte plus qu'index.html ou un fichier DÉJÀ présent dans le dépôt sélectionné : un fichier portant un nom inconnu du dépôt est refusé, avec un message renvoyant vers « Gérer les autres fichiers » → « ➕ Ajouter un fichier au dépôt ». Tant que le fichier n'est pas accepté, rien n'est chargé dans la zone de code."],
         ["v1.40", "Un fichier glissé dans la zone HTML de l'étape 3 qui porte un autre nom qu'index.html mais qui existe déjà dans le dépôt sélectionné déclenche une demande de confirmation : une fois confirmé, il est mis à jour directement là, avec le commentaire de version de cette même zone, sans passer par « Gérer les autres fichiers ». Un bandeau orange rappelle la cible réelle, et le bouton d'envoi affiche le nom du fichier visé."],
         ["v1.39", "« 🔗 Copier l'URL de l'appli » contrôle désormais que l'adresse sert bien la dernière version : il compare le contenu réellement publié au dernier commit, identifie la version servie si ce n'est pas la bonne, distingue un retard de publication GitHub Pages d'un cache local du navigateur, et affiche la marche à suivre correspondante (avec lien anti-cache le cas échéant)."],
