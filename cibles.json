@@ -122,6 +122,6 @@
       "repo": "appstore"
     }
   ],
-  "derniereCible": "appstore",
-  "maj": "2026-09-20T10:11:35.659Z"
+  "derniereCible": "deployer",
+  "maj": "2026-09-20T16:49:07.754Z"
 }
