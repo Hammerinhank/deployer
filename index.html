@@ -78,6 +78,34 @@
             border: 2px dashed #5856d6;
             background: #f0f0ff;
         }
+        /* Bandeau « cible détournée » de la section 3 (v1.40) : quand la zone
+           HTML contient en réalité un autre fichier du dépôt. */
+        #cible-alternative {
+            margin: 10px 0 4px 0;
+            padding: 12px 14px;
+            border: 2px solid #ff9500;
+            border-radius: 8px;
+            background: #fff6e6;
+            color: #1d1d1f;
+            font-size: 13.5px;
+            line-height: 1.5;
+        }
+        #cible-alternative .cible-alt-titre { font-weight: 700; display: block; margin-bottom: 4px; }
+        #cible-alternative code {
+            background: #fff;
+            border: 1px solid #f0d7a8;
+            border-radius: 4px;
+            padding: 1px 5px;
+            font-size: 13px;
+        }
+        #cible-alternative button {
+            width: auto;
+            display: inline-block;
+            margin-top: 8px;
+            padding: 6px 12px;
+            font-size: 12.5px;
+            background: #6e6e73;
+        }
         /* Zone de glisser-déposer du bloc « Ajouter un fichier » (v1.37) */
         #zone-depot-nouveau-fichier {
             margin-top: 10px;
@@ -571,7 +599,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <button type="button" id="version-badge" onclick="ouvrirHistoriqueVersions()" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:5px 12px;border:none;border-radius:20px;vertical-align:middle;width:auto;cursor:pointer;" title="Voir l'historique des versions">v1.39</button></h1>
+    <h1>🚀 Le Déployeur <button type="button" id="version-badge" onclick="ouvrirHistoriqueVersions()" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:5px 12px;border:none;border-radius:20px;vertical-align:middle;width:auto;cursor:pointer;" title="Voir l'historique des versions">v1.41</button></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -658,13 +686,15 @@
         <label for="select-target">Choisir l'application à mettre à jour</label>
         <select id="select-target"></select>
 
-        <label for="html-code">Colle le nouveau code HTML ici <span style="font-weight:400; color:#86868b;">— ou glisse un fichier .html dessus</span></label>
+        <label for="html-code">Colle le nouveau code HTML ici <span style="font-weight:400; color:#86868b;">— ou glisse dessus index.html, ou un fichier déjà présent dans le dépôt</span></label>
         <textarea id="html-code" placeholder="Colle ton code, ou glisse-dépose un fichier .html ici…"></textarea>
+
+        <div id="cible-alternative" style="display:none;"></div>
 
         <label for="commit-comment">Commentaire de version (obligatoire)</label>
         <textarea id="commit-comment" class="commentaire-version" rows="3" placeholder="Ex : Ajout du bouton de partage&#10;&#10;Tu peux coller ici un texte sur plusieurs lignes (titres, listes, gras) : la mise en page est conservée dans l'historique." autocomplete="off" spellcheck="false"></textarea>
 
-        <button class="btn" onclick="deployerCode()" style="background-color: #5856d6;" data-tip="Envoie le contenu de la zone de code ci-dessus comme nouvelle version (un nouveau commit) du fichier index.html de l'application cible sélectionnée. Le commentaire de version est obligatoire et apparaîtra dans l'historique (section 4). Une vérification automatique confirme ensuite que le fichier réellement en ligne correspond bien à ce qui vient d'être envoyé.">Mettre à jour sur GitHub</button>
+        <button class="btn" id="btn-deployer" onclick="deployerCode()" style="background-color: #5856d6;" data-tip="Envoie le contenu de la zone de code ci-dessus comme nouvelle version (un nouveau commit) du fichier index.html de l'application cible sélectionnée. Le commentaire de version est obligatoire et apparaîtra dans l'historique (section 4). Une vérification automatique confirme ensuite que le fichier réellement en ligne correspond bien à ce qui vient d'être envoyé. Depuis la v1.41, si tu as glissé dans la zone ci-dessus un fichier portant un autre nom mais DÉJÀ présent dans le dépôt (et que tu as confirmé), c'est CE fichier qui est mis à jour, avec le même commentaire de version — un bandeau orange le rappelle. Un fichier dont le nom n'existe pas encore dans le dépôt est refusé : il doit être créé via « Gérer les autres fichiers » → « ➕ Ajouter un fichier au dépôt ».">Mettre à jour sur GitHub</button>
         <button class="btn" id="btn-autres-fichiers" onclick="ouvrirPageAutresFichiers()" style="display:none; background-color: #5856d6; margin-top: 10px;" data-tip="Ouvre un écran séparé listant tous les fichiers du dépôt (autres que le fichier HTML) de l'application actuellement sélectionnée juste au-dessus, si elle est cochée à l'étape 2. Permet de mettre à jour ces fichiers un par un sur GitHub, avec la même logique que ci-dessus (copier-coller ou glisser-déposer, double-clic pour vider).">📁 Gérer les autres fichiers</button>
     </div>
 
@@ -1629,6 +1659,7 @@
             mettreAJourBoutonAutresFichiers();
             afficherLigneUrlAppli(null);
             viderHistoriqueSurChangementCible();
+            reinitialiserCibleAlternative();   // v1.40 : la cible particulière ne vaut que pour un dépôt
         });
     document.getElementById('select-history-target')
         .addEventListener('change', (e) => {
@@ -1637,6 +1668,7 @@
             mettreAJourBoutonAutresFichiers();
             afficherLigneUrlAppli(null);
             viderHistoriqueSurChangementCible();
+            reinitialiserCibleAlternative();   // v1.40
         });
 
     async function recupererTousLesDepots() {
@@ -3210,6 +3242,10 @@
         const repo = document.getElementById('select-target').value;
         const code = document.getElementById('html-code').value;
         const commentaire = document.getElementById('commit-comment').value.trim();
+        // v1.40 : normalement index.html, sauf si un autre fichier du dépôt a
+        // été déposé dans la zone de code et confirmé.
+        const chemin = cheminDeploiementCourant();
+        const estIndex = (chemin === 'index.html');
 
         if(!verifierConfig()) return;
         if(!repo) {
@@ -3218,6 +3254,16 @@
         }
         if(!code.trim()) {
             afficherMessage("Erreur : La zone de texte contenant le code HTML est vide.", "error");
+            return;
+        }
+        if (cibleFichierAlternative && cibleFichierAlternative.repo !== repo) {
+            // Sécurité : la cible alternative appartient à un autre dépôt.
+            reinitialiserCibleAlternative();
+            afficherMessage(
+                "L'application cible a changé depuis que le fichier a été déposé : la cible particulière " +
+                "a été annulée. Recommence le glisser-déposer si besoin.",
+                "error"
+            );
             return;
         }
 
@@ -3234,9 +3280,9 @@
             return;
         }
 
-        afficherMessage("Vérification du fichier existant sur GitHub...", "success");
+        afficherMessage(`Vérification du fichier « ${chemin} » existant sur GitHub...`, "success");
 
-        const url = `https://api.github.com/repos/${config.user}/${repo}/contents/index.html`;
+        const url = `https://api.github.com/repos/${config.user}/${repo}/contents/${encoderCheminAPI(chemin)}`;
         let sha = null;
 
         let contenuActuel = null;
@@ -3283,7 +3329,15 @@
 
             if (!reponsePut.ok) {
                 const errData = await reponsePut.json().catch(() => ({}));
-                afficherMessage(`Échec du déploiement : ${errData.message || reponsePut.statusText}`, "error");
+                const indiceWorkflow = chemin.startsWith('.github/workflows/')
+                    ? "\n\nℹ️ C'est un fichier de workflow GitHub Actions : ton token doit avoir la portée " +
+                      "« workflow » (token classique) ou « Workflows: Read and write » (fine-grained), sans quoi " +
+                      "GitHub refuse l'écriture avec un 403."
+                    : "";
+                afficherMessage(
+                    `Échec du déploiement de « ${chemin} » : ${errData.message || reponsePut.statusText}` + indiceWorkflow,
+                    "error"
+                );
                 return;
             }
 
@@ -3291,15 +3345,17 @@
             const shaCommitComplet = (resultat.commit && resultat.commit.sha) ? resultat.commit.sha : null;
             const shaCommit = shaCommitComplet ? shaCommitComplet.substring(0, 7) : "inconnu";
             const cheminEcrit = (resultat.content && resultat.content.path)
-                ? resultat.content.path : "index.html";
+                ? resultat.content.path : chemin;
 
-            if (cheminEcrit !== "index.html") {
+            if (cheminEcrit !== chemin) {
                 afficherMessage(
                     "⚠️ FAUX SUCCÈS DÉTECTÉ\n\n" +
                     `Le commit ${shaCommit} a bien été créé, MAIS GitHub dit avoir écrit ` +
-                    `dans « ${cheminEcrit} », et non dans « index.html ».\n\n` +
-                    "C'est très probablement pour ça que ton appli ne changeait pas : la " +
-                    "page réellement affichée est « index.html » (minuscule), pas celle-ci.\n\n" +
+                    `dans « ${cheminEcrit} », et non dans « ${chemin} ».\n\n` +
+                    (estIndex
+                        ? "C'est très probablement pour ça que ton appli ne changeait pas : la " +
+                          "page réellement affichée est « index.html » (minuscule), pas celle-ci.\n\n"
+                        : "Il existe donc dans le dépôt un fichier qui ne diffère que par la casse.\n\n") +
                     "➡️ Va dans le dépôt sur GitHub et SUPPRIME le fichier en double " +
                     "(celui qui ne diffère que par une majuscule).\n\n" +
                     "Ton code n'a pas été perdu, il est toujours dans la zone ci-dessus.",
@@ -3308,14 +3364,15 @@
                 return;
             }
 
-            // Le commit existe : l'historique affiché est désormais périmé, on le
-            // retire exactement comme un second clic sur « Charger l'historique ».
-            if (historiqueEstAffiche()) viderHistorique();
+            // Le commit existe : l'historique affiché (celui d'index.html) n'est
+            // périmé que si c'est bien index.html qui vient d'être commité.
+            if (estIndex && historiqueEstAffiche()) viderHistorique();
 
             afficherMessage(`Commit ${shaCommit} créé. Vérification du contenu réellement en ligne...`, "success");
 
-            // Surveillance de la publication GitHub Pages, en parallèle de la vérification
-            surveillerPublicationPages(repo, code);
+            // Surveillance de la publication GitHub Pages, en parallèle de la
+            // vérification — seulement pour index.html, la page réellement servie.
+            if (estIndex) surveillerPublicationPages(repo, code);
 
             const verif = await verifierContenuEnLigne(url, code, shaCommitComplet, (n, total) => {
                 afficherMessage(
@@ -3327,20 +3384,25 @@
             const verifOk = verif.ok;
             const detailVerif = verif.detail;
 
-            const doublons = await detecterDoublonsCasse(repo, "index.html");
+            // La détection des doublons de casse ne sait lire que la racine du
+            // dépôt : on l'évite pour un fichier rangé dans un sous-dossier.
+            const doublons = chemin.includes('/') ? null : await detecterDoublonsCasse(repo, chemin);
             const aDoublons = Array.isArray(doublons) && doublons.length > 1;
 
             if (verifOk && !aDoublons) {
                 afficherMessage(
                     "✅ Déploiement VÉRIFIÉ !\n\n" +
-                    `Commit ${shaCommit} — le contenu en ligne correspond exactement à ce ` +
+                    `Commit ${shaCommit} — le contenu de « ${chemin} » en ligne correspond exactement à ce ` +
                     "que tu as envoyé.\n\n" +
-                    "Ton application sera à jour sur ton iPhone d'ici 30 à 60 secondes.",
+                    (estIndex
+                        ? "Ton application sera à jour sur ton iPhone d'ici 30 à 60 secondes."
+                        : "Ce fichier n'est pas la page de l'application : rien d'autre n'a été touché dans le dépôt."),
                     "success"
                 );
                 document.getElementById('html-code').value = "";
                 document.getElementById('commit-comment').value = "";
                 ajusterHauteurCommentaire(document.getElementById('commit-comment'));
+                reinitialiserCibleAlternative();
             } else if (verifOk && aDoublons) {
                 afficherMessage(
                     `✅ Le contenu a bien été mis à jour (commit ${shaCommit}).\n\n` +
@@ -4296,6 +4358,230 @@
         }
     }
 
+    // =====================================================================
+    //  v1.40 — Déployer, depuis la zone HTML, un autre fichier du dépôt
+    //
+    //  Quand on glisse dans la zone de code (section 3) un fichier dont le nom
+    //  n'est pas « index.html » mais qui existe DÉJÀ dans le dépôt sélectionné,
+    //  on demande confirmation puis on met à jour CE fichier, avec le
+    //  commentaire de version de cette même section — sans avoir à passer par
+    //  « Gérer les autres fichiers ».
+    // =====================================================================
+    let cibleFichierAlternative = null;   // { repo, chemin } — null ⇒ index.html
+
+    function cheminDeploiementCourant() {
+        const repo = document.getElementById('select-target').value;
+        if (cibleFichierAlternative && cibleFichierAlternative.repo === repo) {
+            return cibleFichierAlternative.chemin;
+        }
+        return 'index.html';
+    }
+
+    function reinitialiserCibleAlternative() {
+        cibleFichierAlternative = null;
+        afficherBandeauCibleAlternative();
+    }
+
+    function afficherBandeauCibleAlternative() {
+        const bandeau = document.getElementById('cible-alternative');
+        const bouton = document.getElementById('btn-deployer');
+        if (!bandeau) return;
+
+        if (!cibleFichierAlternative) {
+            bandeau.style.display = 'none';
+            bandeau.innerHTML = '';
+            if (bouton) bouton.textContent = 'Mettre à jour sur GitHub';
+            return;
+        }
+
+        bandeau.style.display = 'block';
+        bandeau.innerHTML =
+            '<span class="cible-alt-titre">🎯 Ce déploiement ne visera PAS index.html</span>' +
+            'Le contenu de la zone ci-dessus sera enregistré dans <code>' +
+            echapperHtml(cibleFichierAlternative.chemin) + '</code> du dépôt <code>' +
+            echapperHtml(cibleFichierAlternative.repo) +
+            '</code>, avec le commentaire de version saisi juste en dessous.<br>';
+
+        const btn = document.createElement('button');
+        btn.className = 'btn';
+        btn.textContent = '↩️ Revenir à index.html';
+        btn.onclick = function () {
+            reinitialiserCibleAlternative();
+            afficherMessage(
+                "Cible remise sur index.html. Le contenu de la zone de code n'a pas été touché.",
+                "success"
+            );
+        };
+        bandeau.appendChild(btn);
+
+        if (bouton) bouton.textContent = 'Mettre à jour « ' + cibleFichierAlternative.chemin + ' » sur GitHub';
+    }
+
+    async function brancheParDefautDepot(repo) {
+        try {
+            const rr = await fetch(`https://api.github.com/repos/${config.user}/${repo}`, {
+                headers: headersGitHub(), cache: "no-store"
+            });
+            if (rr.ok) {
+                const dd = await rr.json();
+                return dd.default_branch || 'main';
+            }
+        } catch (_) { /* on retombe sur main */ }
+        return 'main';
+    }
+
+    // Cherche dans le dépôt les fichiers dont le NOM (dernier segment du chemin)
+    // est celui du fichier déposé. Les correspondances exactes (casse comprise)
+    // et les fichiers à la racine sont placés en tête.
+    async function chercherFichierDansDepot(repo, nomFichier) {
+        const branche = await brancheParDefautDepot(repo);
+        const resultat = await listerFichiersHorsHtml(repo, branche);
+        const tous = Array.isArray(resultat.tous) ? resultat.tous : [];
+        const nomBas = nomFichier.toLowerCase();
+
+        return tous
+            .filter(p => p.split('/').pop().toLowerCase() === nomBas)
+            .sort((a, b) => {
+                const exactA = a.split('/').pop() === nomFichier ? 0 : 1;
+                const exactB = b.split('/').pop() === nomFichier ? 0 : 1;
+                if (exactA !== exactB) return exactA - exactB;
+                return a.split('/').length - b.split('/').length;   // racine avant sous-dossier
+            });
+    }
+
+    function commentaireVersionSuffisant() {
+        const champ = document.getElementById('commit-comment');
+        if (!champ) return false;
+        return champ.value.trim().split(/\s+/).filter(m => m.length > 0).length >= 3;
+    }
+
+    // Renvoie true si la situation a été prise en charge (message déjà affiché).
+    // Le contenu n'est chargé dans la zone de code QUE si le fichier est accepté :
+    // un fichier inconnu du dépôt est refusé (il doit être créé via « Gérer les
+    // autres fichiers » → « ➕ Ajouter un fichier au dépôt »).
+    async function traiterFichierDepose(nomFichier, contenu, zone) {
+        const repo = document.getElementById('select-target').value;
+
+        if (!config.user || !config.token) {
+            reinitialiserCibleAlternative();
+            afficherMessage(
+                `⛔ FICHIER REFUSÉ — « ${nomFichier} »\n\n` +
+                "Ce nom n'est pas celui de la page HTML de l'application (index.html), et tes identifiants " +
+                "GitHub ne sont pas enregistrés : impossible de vérifier si ce fichier existe déjà dans le dépôt.\n\n" +
+                "Renseigne tes identifiants à l'étape 1, puis recommence. La zone de code n'a pas été modifiée.",
+                "error"
+            );
+            return;
+        }
+
+        if (!repo) {
+            reinitialiserCibleAlternative();
+            afficherMessage(
+                `⛔ FICHIER REFUSÉ — « ${nomFichier} »\n\n` +
+                "Ce nom n'est pas celui de la page HTML de l'application (index.html), et aucune application " +
+                "cible n'est sélectionnée : impossible de vérifier si ce fichier existe déjà dans un dépôt.\n\n" +
+                "Choisis l'application ci-dessus, puis recommence. La zone de code n'a pas été modifiée.",
+                "error"
+            );
+            return;
+        }
+
+        let candidats = [];
+        try {
+            afficherMessage(
+                `Fichier « ${nomFichier} » : vérification de son existence dans le dépôt « ${repo} »…`,
+                "success"
+            );
+            candidats = await chercherFichierDansDepot(repo, nomFichier);
+        } catch (e) {
+            reinitialiserCibleAlternative();
+            afficherMessage(
+                `⛔ FICHIER REFUSÉ — « ${nomFichier} »\n\n` +
+                `Impossible de vérifier s'il existe déjà dans le dépôt « ${repo} » (${e.message}).\n\n` +
+                "Par précaution, rien n'a été chargé dans la zone de code : sans cette vérification, " +
+                "un clic sur « Mettre à jour sur GitHub » écraserait index.html avec ce contenu.",
+                "error"
+            );
+            return;
+        }
+
+        // Fichier absent du dépôt : c'est une CRÉATION, elle ne se fait pas ici.
+        if (candidats.length === 0) {
+            reinitialiserCibleAlternative();
+            afficherMessage(
+                `⛔ FICHIER REFUSÉ — « ${nomFichier} » est un NOUVEAU fichier\n\n` +
+                `Ce nom n'est pas celui de la page HTML de l'application (index.html), et aucun fichier de ` +
+                `ce nom n'existe dans le dépôt « ${repo} ».\n\n` +
+                "Cette zone ne sert qu'à METTRE À JOUR un fichier existant. Pour créer un nouveau fichier, " +
+                "utilise le mécanisme prévu pour ça :\n\n" +
+                "➡️ « 📁 Gérer les autres fichiers » (le bouton juste en dessous, visible si cette application " +
+                "est cochée à l'étape 2), puis « ➕ Ajouter un fichier au dépôt ».\n\n" +
+                "La zone de code n'a pas été modifiée.",
+                "error"
+            );
+            return;
+        }
+
+        // La zone de code lit le fichier comme du texte : un binaire y serait
+        // irrémédiablement abîmé, on refuse le raccourci.
+        if (!estFichierTexte(nomFichier)) {
+            reinitialiserCibleAlternative();
+            afficherMessage(
+                `⛔ FICHIER REFUSÉ — « ${nomFichier} »\n\n` +
+                `Il existe bien dans le dépôt « ${repo} », mais c'est un fichier binaire (image, archive, police…).\n\n` +
+                "La zone de code le lit comme du texte : l'envoyer depuis ici le rendrait inutilisable. " +
+                "Passe par GitHub directement pour ce type de fichier. La zone de code n'a pas été modifiée.",
+                "error"
+            );
+            return;
+        }
+
+        const chemin = candidats[0];
+        const autres = candidats.length > 1
+            ? `\n\n(${candidats.length} fichiers portent ce nom : ${candidats.join(", ")} — c'est le premier qui sera visé.)`
+            : "";
+        const commentaireOk = commentaireVersionSuffisant();
+
+        const ok = await confirmerModal(
+            "📄 CE FICHIER EXISTE DÉJÀ DANS LE DÉPÔT\n\n" +
+            `Tu as déposé « ${nomFichier} » dans la zone réservée au HTML, et ce nom correspond ` +
+            `au fichier « ${chemin} » du dépôt « ${repo} ».` + autres + "\n\n" +
+            (commentaireOk
+                ? "Veux-tu le mettre à jour tout de suite sur ce dépôt — sans passer par « Gérer les autres fichiers » — " +
+                  "avec le commentaire de version déjà saisi ci-dessous ?"
+                : "Veux-tu le mettre à jour sur ce dépôt, sans passer par « Gérer les autres fichiers » ?\n\n" +
+                  "Il te restera à saisir le commentaire de version, puis à cliquer sur « Mettre à jour sur GitHub »."),
+            commentaireOk ? "Oui, déployer maintenant" : "Oui, viser ce fichier",
+            "Non, annuler"
+        );
+
+        if (!ok) {
+            reinitialiserCibleAlternative();
+            afficherMessage(
+                `Mise à jour de « ${nomFichier} » annulée. La zone de code n'a pas été modifiée.`,
+                "error"
+            );
+            return;
+        }
+
+        zone.value = contenu;
+        cibleFichierAlternative = { repo: repo, chemin: chemin };
+        afficherBandeauCibleAlternative();
+
+        if (commentaireOk) {
+            await deployerCode();
+        } else {
+            afficherMessage(
+                `🎯 Cible armée : « ${chemin} » (dépôt ${repo}).\n\n` +
+                "Saisis le commentaire de version juste en dessous de la zone de code, puis clique sur " +
+                "« Mettre à jour sur GitHub ». C'est ce fichier qui sera mis à jour, pas index.html.",
+                "success"
+            );
+            const champ = document.getElementById('commit-comment');
+            if (champ) champ.focus();
+        }
+    }
+
     function initGlisserDeposerHtml() {
         const zone = document.getElementById('html-code');
         if (!zone) return;
@@ -4332,16 +4618,27 @@
             if (!fichier) return;
 
             const nom = (fichier.name || '').toLowerCase();
-            const estHtml = nom.endsWith('.html') || nom.endsWith('.htm') || fichier.type === 'text/html';
 
             const lecteur = new FileReader();
-            lecteur.onload = () => {
-                zone.value = lecteur.result;
+            lecteur.onload = async () => {
+                const contenu = lecteur.result;
+
+                // v1.41 : seul le fichier HTML habituel (index.html) se charge
+                // directement. Tout autre nom passe par un contrôle : mise à jour
+                // d'un fichier existant du dépôt (après confirmation), ou refus.
+                const estIndex = (nom === 'index.html' || nom === 'index.htm');
+                if (!estIndex) {
+                    await traiterFichierDepose(fichier.name, contenu, zone);
+                    return;
+                }
+
+                zone.value = contenu;
+                reinitialiserCibleAlternative();
+
                 afficherMessage(
-                    `Fichier « ${fichier.name} » chargé dans la zone de code` +
-                    (estHtml ? "" : " ⚠️ (son extension n'est pas .html — vérifie que c'est bien du HTML)") +
-                    ".\n\nN'oublie pas le commentaire de version, puis « Mettre à jour sur GitHub ».",
-                    estHtml ? "success" : "error"
+                    `Fichier « ${fichier.name} » chargé dans la zone de code.\n\n` +
+                    "N'oublie pas le commentaire de version, puis « Mettre à jour sur GitHub ».",
+                    "success"
                 );
             };
             lecteur.onerror = () => afficherMessage(`Impossible de lire le fichier « ${fichier.name} ».`, "error");
@@ -4370,6 +4667,7 @@
             if (ok) {
                 zone.value = "";
                 zone.focus();
+                reinitialiserCibleAlternative();   // v1.40 : plus de contenu, plus de cible particulière
             }
         }
 
@@ -5899,6 +6197,8 @@
     //  liste. Ajouter ici une entrée à CHAQUE nouvelle version.
     // =====================================================================
     const HISTORIQUE_VERSIONS = [
+        ["v1.41", "La zone HTML de l'étape 3 n'accepte plus qu'index.html ou un fichier DÉJÀ présent dans le dépôt sélectionné : un fichier portant un nom inconnu du dépôt est refusé, avec un message renvoyant vers « Gérer les autres fichiers » → « ➕ Ajouter un fichier au dépôt ». Tant que le fichier n'est pas accepté, rien n'est chargé dans la zone de code."],
+        ["v1.40", "Un fichier glissé dans la zone HTML de l'étape 3 qui porte un autre nom qu'index.html mais qui existe déjà dans le dépôt sélectionné déclenche une demande de confirmation : une fois confirmé, il est mis à jour directement là, avec le commentaire de version de cette même zone, sans passer par « Gérer les autres fichiers ». Un bandeau orange rappelle la cible réelle, et le bouton d'envoi affiche le nom du fichier visé."],
         ["v1.39", "« 🔗 Copier l'URL de l'appli » contrôle désormais que l'adresse sert bien la dernière version : il compare le contenu réellement publié au dernier commit, identifie la version servie si ce n'est pas la bonne, distingue un retard de publication GitHub Pages d'un cache local du navigateur, et affiche la marche à suivre correspondante (avec lien anti-cache le cas échéant)."],
         ["v1.38", "Les commentaires de version gardent leur mise en page : champs « Commentaire de version » devenus des zones multi-lignes, et affichage enrichi dans l'historique (titres, listes, gras, code, retours à la ligne). Les commentaires longs sont repliés avec un bouton « Afficher tout ». Le numéro de version ouvre cette fenêtre."],
         ["v1.37", "Page « autres fichiers » : bouton « ➕ Ajouter un fichier au dépôt » (carte NOUVEAU créée localement, fichier réellement créé au premier envoi, contrôles du chemin et des doublons de casse)."],
