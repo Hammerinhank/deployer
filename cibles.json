@@ -116,8 +116,12 @@
     {
       "name": "Bibliothèque",
       "repo": "bibliotheque"
+    },
+    {
+      "name": "Apps Store",
+      "repo": "appstore"
     }
   ],
   "derniereCible": "bibliotheque",
-  "maj": "2026-09-19T19:55:40.121Z"
+  "maj": "2026-09-20T10:06:19.753Z"
 }
