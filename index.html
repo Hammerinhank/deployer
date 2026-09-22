@@ -632,7 +632,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <button type="button" id="version-badge" onclick="ouvrirHistoriqueVersions()" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:5px 12px;border:none;border-radius:20px;vertical-align:middle;width:auto;cursor:pointer;" title="Voir l'historique des versions">v1.44</button></h1>
+    <h1>🚀 Le Déployeur <button type="button" id="version-badge" onclick="ouvrirHistoriqueVersions()" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:5px 12px;border:none;border-radius:20px;vertical-align:middle;width:auto;cursor:pointer;" title="Voir l'historique des versions">v1.45</button></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -3774,9 +3774,148 @@
         return normaliser(recu) === normaliser(attendu);
     }
 
+    // =====================================================================
+    //  v1.45 — Pourquoi l'URL ne sert-elle pas le code déployé ?
+    //  Passe en revue les causes connues, de la plus bloquante à la plus
+    //  bénigne. Renvoie { cause, definitive, titre, texte, action? } ou null
+    //  si rien d'anormal n'est détecté (publication simplement en cours).
+    // =====================================================================
+    let derniereSurveillance = null;   // pour relancer la surveillance après une correction
+
+    async function diagnostiquerPublication(repo) {
+        const base = `https://api.github.com/repos/${config.user}/${repo}`;
+        const reglages = `https://github.com/${config.user}/${repo}/settings/pages`;
+
+        // 1. Le dépôt lui-même
+        let depot = null;
+        try {
+            const r = await fetch(base, { headers: headersGitHub(), cache: "no-store" });
+            if (r.ok) depot = await r.json();
+        } catch (_) {}
+        const branche = (depot && depot.default_branch) || "main";
+
+        // 2. Pages est-il activé ? (404 = aucun site Pages sur ce dépôt)
+        let pages = null, pagesStatut = 0;
+        try {
+            const r = await fetch(`${base}/pages`, { headers: headersGitHub(), cache: "no-store" });
+            pagesStatut = r.status;
+            if (r.ok) pages = await r.json();
+        } catch (_) {}
+
+        if (depot && depot.private && !pages) {
+            return { cause: "prive", definitive: true,
+                titre: "⛔ DÉPÔT PRIVÉ : GITHUB PAGES N'Y EST PAS DISPONIBLE",
+                texte: `« ${repo} » est privé. Avec un compte GitHub gratuit, Pages ne publie que les dépôts publics : ` +
+                       "le code est bien commité, mais il ne sera jamais servi.\n\n" +
+                       "QUE FAIRE :\n" +
+                       `1. Repasse le dépôt en public : https://github.com/${config.user}/${repo}/settings ` +
+                       "→ tout en bas, « Danger Zone » → Change visibility → Make public.\n" +
+                       "2. Puis active Pages avec le bouton qui apparaîtra ici.\n\n" +
+                       "Si ce dépôt doit rester privé (des données sensibles), c'est qu'il ne doit pas contenir l'appli : " +
+                       "garde l'appli dans un dépôt public et les données dans le dépôt privé." };
+        }
+        if (pagesStatut === 404) {
+            return { cause: "inactif", definitive: true, action: "activer",
+                titre: "⛔ GITHUB PAGES N'EST PAS ACTIVÉ SUR CE DÉPÔT",
+                texte: `Le commit est bien dans « ${repo} », mais aucun site Pages ne le publie : l'adresse répondra ` +
+                       "« 404 — There isn't a GitHub Pages site here » indéfiniment.\n\n" +
+                       "Cause la plus fréquente : le dépôt a été supprimé puis recréé. Le réglage Pages ne fait pas " +
+                       "partie du contenu, il disparaît avec l'ancien dépôt.\n\n" +
+                       "QUE FAIRE : touche « Activer GitHub Pages pour cette appli » juste sous le bouton vert. " +
+                       `À défaut : ${reglages} → Source : « Deploy from a branch », branche ${branche}, dossier / (root) → Save. ` +
+                       "La surveillance reprendra d'elle-même ; la toute première publication prend 1 à 2 minutes." };
+        }
+        if (!pages) return null;   // état de Pages illisible (droits du token) : on n'invente pas de cause
+
+        // 3. Pages publie-t-il la branche et le dossier où l'on déploie ?
+        const src = pages.source || {};
+        if (pages.build_type !== "workflow" && src.branch && (src.branch !== branche || (src.path && src.path !== "/"))) {
+            return { cause: "source", definitive: true, action: "source", branche,
+                titre: "⛔ PAGES PUBLIE UN AUTRE ENDROIT QUE CELUI OÙ TU DÉPLOIES",
+                texte: `Tu déploies index.html à la racine de la branche « ${branche} », mais Pages publie ` +
+                       `la branche « ${src.branch} », dossier « ${src.path || "/"} ». Tes commits ne sont donc jamais publiés.\n\n` +
+                       `QUE FAIRE : touche « Publier la branche ${branche}, dossier / » sous le bouton vert, ` +
+                       `ou corrige-le dans ${reglages}.` };
+        }
+
+        // 4. La dernière publication a-t-elle échoué ?
+        const build = await lireDernierBuildPages(repo);
+        if (build && build.status === "errored") {
+            const cause = build.error && build.error.message ? build.error.message : "cause non précisée par GitHub";
+            return { cause: "echec", definitive: true, action: "relancer",
+                titre: "⛔ LA PUBLICATION GITHUB PAGES A ÉCHOUÉ",
+                texte: `Dernière publication en échec : ${cause}.\n\n` +
+                       "QUE FAIRE :\n" +
+                       "1. Touche « Relancer la publication » sous le bouton vert.\n" +
+                       `2. Si l'échec se répète, ouvre https://github.com/${config.user}/${repo}/actions : ` +
+                       "le détail de l'erreur est dans « pages build and deployment »." };
+        }
+
+        // 5. Doublon index.html / Index.html : on écrit dans l'un, Pages publie l'autre
+        const doublons = await detecterDoublonsCasse(repo, "index.html");
+        if (Array.isArray(doublons) && doublons.length > 1) {
+            return { cause: "doublon", definitive: true,
+                titre: "⛔ PLUSIEURS index.html NE DIFFÉRANT QUE PAR LA CASSE",
+                texte: `Le dépôt contient : ${doublons.join("   ·   ")}.\n` +
+                       "Tu écris dans l'un, Pages publie l'autre.\n\n" +
+                       "QUE FAIRE : supprime le doublon (section « Gérer les autres fichiers », ou l'app Supprime-doublon), " +
+                       "puis redéploie." };
+        }
+
+        return null;   // Pages actif, source correcte, pas d'échec : la publication est simplement en cours
+    }
+
+    // Bouton de remède, affiché sous « Copier l'URL de l'appli »
+    function afficherRemede(repo, diag) {
+        const url = urlPagesDevinee(repo);
+        if (diag.action === "activer") { afficherLigneUrlAppliInactive(repo, url); return; }
+        const ligne = document.getElementById('url-appli-ligne');
+        if (!ligne) return;
+        ligne.innerHTML = "";
+        if (!diag.action) return;
+        const btn = document.createElement('button');
+        btn.className = 'btn';
+        btn.style.backgroundColor = '#5856d6';
+        btn.style.marginTop = '10px';
+        btn.textContent = diag.action === "source" ? `Publier la branche ${diag.branche}, dossier /` : "Relancer la publication";
+        btn.addEventListener('click', () => corrigerPublication(repo, diag, btn));
+        ligne.appendChild(btn);
+    }
+
+    async function corrigerPublication(repo, diag, bouton) {
+        if (!verifierConfig()) return;
+        const base = `https://api.github.com/repos/${config.user}/${repo}/pages`;
+        const origine = bouton.textContent;
+        bouton.disabled = true; bouton.textContent = "Correction…";
+        try {
+            const resp = diag.action === "source"
+                ? await fetch(base, { method: "PUT", headers: headersGitHub(), body: JSON.stringify({ source: { branch: diag.branche, path: "/" } }) })
+                : await fetch(`${base}/builds`, { method: "POST", headers: headersGitHub() });
+            if (!resp.ok) {
+                const e = await resp.json().catch(() => ({}));
+                throw new Error((e.message || resp.statusText) + " — le token doit pouvoir administrer le dépôt (portée repo, ou permissions Pages + Administration en fine-grained)");
+            }
+            bouton.textContent = "Fait ✓";
+            afficherMessage(diag.action === "source"
+                ? `✅ Pages publie désormais la branche ${diag.branche}, dossier /. Surveillance relancée : compte 1 à 2 minutes.`
+                : "✅ Publication relancée. Surveillance relancée : compte 1 à 2 minutes.", "success");
+            relancerSurveillance(repo);
+        } catch (err) {
+            bouton.disabled = false; bouton.textContent = origine;
+            afficherMessage(`Correction impossible : ${err.message}.`, "error");
+        }
+    }
+
+    function relancerSurveillance(repo) {
+        const d = derniereSurveillance;
+        if (d && d.repo === repo) surveillerPublicationPages(d.repo, d.code, d.libelle);
+    }
+
     async function surveillerPublicationPages(repo, codeDeploye, libelleVersion) {
         arreterSurveillancePages();
         if (!repo) return;
+        derniereSurveillance = { repo, code: codeDeploye, libelle: libelleVersion };
+        const DIAGNOSTIC_TOUTES_LES = 6;    // un diagnostic toutes les 6 tentatives, soit 30 s
 
         const description = libelleVersion || "la version qui vient d'être commitée";
         const urlPublique = `https://hammerinhank.github.io/${repo}/`;
@@ -3822,6 +3961,22 @@
             }
 
             clignoterBouton('pages-attente', PAGES_ROUGE_MS);
+
+            // v1.45 : au premier échec puis toutes les 30 s, on cherche la cause au lieu d'attendre à l'aveugle.
+            if (etat.tentatives === 1 || etat.tentatives % DIAGNOSTIC_TOUTES_LES === 0) {
+                let diag = null;
+                try { diag = await diagnostiquerPublication(repo); } catch (_) { diag = null; }
+                if (pagesSurveillanceEnCours !== etat) return;
+                if (diag && diag.definitive) {
+                    // Cause bloquante : inutile d'attendre, on arrête le clignotement et on explique.
+                    pagesSurveillanceEnCours = null;
+                    const bouton = document.getElementById('btn-copier-url');
+                    if (bouton) bouton.classList.remove('pages-attente', 'pages-prete');
+                    afficherRemede(repo, diag);
+                    afficherMessage(diag.titre + "\n\n" + diag.texte, "error");
+                    return;
+                }
+            }
 
             if (etat.tentatives >= PAGES_MAX_TENTATIVES) {
                 pagesSurveillanceEnCours = null;
@@ -4257,6 +4412,7 @@
                 if (resp.ok) { try { const pd = await resp.json(); if (pd.html_url) urlPages = pd.html_url; } catch (_) {} }
                 if (bouton) { bouton.textContent = "Activé ✓"; setTimeout(() => { bouton.textContent = origine; bouton.disabled = false; }, 2000); }
                 afficherLigneUrlAppli(urlPages, "building");
+                relancerSurveillance(repo);   // v1.45 : on reprend la surveillance du déploiement en attente
                 afficherMessage(
                     `✅ GitHub Pages activé pour « ${repo} » (branche ${branche}, dossier /).\n\n` +
                     `Adresse : ${urlPages}\n\n` +
@@ -7016,6 +7172,7 @@
     //  liste. Ajouter ici une entrée à CHAQUE nouvelle version.
     // =====================================================================
     const HISTORIQUE_VERSIONS = [
+        ["v1.45", "Diagnostic automatique quand l'URL de l'appli ne sert pas le code déployé : dès le premier échec de la surveillance, puis toutes les 30 s, le Déployeur cherche la cause — Pages non activé (cas d'un dépôt supprimé puis recréé), dépôt privé (Pages indisponible en offre gratuite), branche ou dossier publiés différents de ceux du déploiement, publication en échec, doublon index.html par la casse — l'explique et propose le remède, avec un bouton quand il est automatisable (activer Pages, corriger la source, relancer la publication). La surveillance reprend d'elle-même après une correction."],
         ["v1.44", "Utilisateur GitHub pré-rempli (Hammerinhank), toujours modifiable : sur un appareil ou un navigateur neuf, seul le token reste à saisir."],
         ["v1.43", "Le libellé au-dessus de la zone de code de l'étape 3 affiche le nom du dépôt concerné, mis à jour à chaque changement d'application cible."],
         ["v1.42", "Correction d'un bug destructeur : les fichiers binaires (images, polices, PDF, archives) étaient lus en texte puis ré-encodés en UTF-8 avant le commit, ce qui remplaçait chaque octet ≥ 0x80 par EF BF BD et supprimait les 0x0D — la signature PNG était détruite. Désormais tout fichier déposé est lu en octets (ArrayBuffer), n'est traité comme du texte que s'il est décodable en UTF-8 strict ET d'extension textuelle, et part en base64 de ses octets bruts encodés par tranches de 8 ko avec décompte de progression. Les cartes de fichiers binaires n'ont plus de zone de texte ni de bouton Edit/Vider mais un dépôt de fichier avec nom, taille, signature et aperçu dimensionné ; la vérification après commit compare la taille, le base64 relu et le SHA Git, refuse un contenu contenant des U+FFFD ou de signature invalide, et signale explicitement un fichier arrivé en mode texte ; l'historique d'un binaire propose Aperçu et Télécharger (reconstruits depuis le base64), Copier étant désactivé."],
