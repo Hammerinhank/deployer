@@ -632,7 +632,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <button type="button" id="version-badge" onclick="ouvrirHistoriqueVersions()" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:5px 12px;border:none;border-radius:20px;vertical-align:middle;width:auto;cursor:pointer;" title="Voir l'historique des versions">v1.42</button></h1>
+    <h1>🚀 Le Déployeur <button type="button" id="version-badge" onclick="ouvrirHistoriqueVersions()" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:5px 12px;border:none;border-radius:20px;vertical-align:middle;width:auto;cursor:pointer;" title="Voir l'historique des versions">v1.43</button></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -719,7 +719,7 @@
         <label for="select-target">Choisir l'application à mettre à jour</label>
         <select id="select-target"></select>
 
-        <label for="html-code">Colle le nouveau code HTML ici <span style="font-weight:400; color:#86868b;">— ou glisse dessus index.html, ou un fichier déjà présent dans le dépôt</span></label>
+        <label for="html-code">Colle le nouveau code HTML ici <span style="font-weight:400; color:#86868b;">— ou glisse dessus index.html, ou un fichier déjà présent dans le dépôt <strong id="libelle-depot-html" style="color:#5856d6; font-weight:700;"></strong></span></label>
         <textarea id="html-code" placeholder="Colle ton code, ou glisse-dépose un fichier .html ici…"></textarea>
 
         <div id="cible-alternative" style="display:none;"></div>
@@ -1547,7 +1547,17 @@
         mettreAJourBoutonAutresFichiers();
     }
 
+    // v1.43 : le libellé de la zone de code nomme le dépôt concerné.
+    function mettreAJourLibelleDepotHtml() {
+        const span = document.getElementById('libelle-depot-html');
+        if (!span) return;
+        const select = document.getElementById('select-target');
+        const repo = select ? select.value : '';
+        span.textContent = repo ? `« ${repo} »` : '(aucune application sélectionnée)';
+    }
+
     function mettreAJourBoutonAutresFichiers() {
+        mettreAJourLibelleDepotHtml();
         const btn = document.getElementById('btn-autres-fichiers');
         if (!btn) return;
         const selectDeploiement = document.getElementById('select-target');
@@ -7004,6 +7014,7 @@
     //  liste. Ajouter ici une entrée à CHAQUE nouvelle version.
     // =====================================================================
     const HISTORIQUE_VERSIONS = [
+        ["v1.43", "Le libellé au-dessus de la zone de code de l'étape 3 affiche le nom du dépôt concerné, mis à jour à chaque changement d'application cible."],
         ["v1.42", "Correction d'un bug destructeur : les fichiers binaires (images, polices, PDF, archives) étaient lus en texte puis ré-encodés en UTF-8 avant le commit, ce qui remplaçait chaque octet ≥ 0x80 par EF BF BD et supprimait les 0x0D — la signature PNG était détruite. Désormais tout fichier déposé est lu en octets (ArrayBuffer), n'est traité comme du texte que s'il est décodable en UTF-8 strict ET d'extension textuelle, et part en base64 de ses octets bruts encodés par tranches de 8 ko avec décompte de progression. Les cartes de fichiers binaires n'ont plus de zone de texte ni de bouton Edit/Vider mais un dépôt de fichier avec nom, taille, signature et aperçu dimensionné ; la vérification après commit compare la taille, le base64 relu et le SHA Git, refuse un contenu contenant des U+FFFD ou de signature invalide, et signale explicitement un fichier arrivé en mode texte ; l'historique d'un binaire propose Aperçu et Télécharger (reconstruits depuis le base64), Copier étant désactivé."],
         ["v1.41", "La zone HTML de l'étape 3 n'accepte plus qu'index.html ou un fichier DÉJÀ présent dans le dépôt sélectionné : un fichier portant un nom inconnu du dépôt est refusé, avec un message renvoyant vers « Gérer les autres fichiers » → « ➕ Ajouter un fichier au dépôt ». Tant que le fichier n'est pas accepté, rien n'est chargé dans la zone de code."],
         ["v1.40", "Un fichier glissé dans la zone HTML de l'étape 3 qui porte un autre nom qu'index.html mais qui existe déjà dans le dépôt sélectionné déclenche une demande de confirmation : une fois confirmé, il est mis à jour directement là, avec le commentaire de version de cette même zone, sans passer par « Gérer les autres fichiers ». Un bandeau orange rappelle la cible réelle, et le bouton d'envoi affiche le nom du fichier visé."],
