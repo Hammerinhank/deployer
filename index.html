@@ -632,7 +632,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <button type="button" id="version-badge" onclick="ouvrirHistoriqueVersions()" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:5px 12px;border:none;border-radius:20px;vertical-align:middle;width:auto;cursor:pointer;" title="Voir l'historique des versions">v1.45</button></h1>
+    <h1>🚀 Le Déployeur <button type="button" id="version-badge" onclick="ouvrirHistoriqueVersions()" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:5px 12px;border:none;border-radius:20px;vertical-align:middle;width:auto;cursor:pointer;" title="Voir l'historique des versions">v1.46</button></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -3499,6 +3499,79 @@
         return { ok: false, detail: dernierDetail };
     }
 
+    // =====================================================================
+    //  v1.46 — Garde-fou « mauvais dépôt » par le titre de la page
+    //
+    //  Le titre (<title>) de chaque page HTML commitée est mémorisé sur la
+    //  cible correspondante (champ titresPages, donc sauvegardé en local ET
+    //  synchronisé avec cibles.json comme le reste des cibles). Avant un
+    //  envoi, si le titre de la page envoyée diffère de celui de la page du
+    //  dernier commit, une fenêtre montre les deux titres et demande de
+    //  confirmer ou d'annuler le transfert.
+    // =====================================================================
+    function extraireTitreHtml(code) {
+        if (typeof code !== 'string') return null;
+        const m = code.match(/<title\b[^>]*>([\s\S]*?)<\/title\s*>/i);
+        if (!m) return null;
+        const t = document.createElement('textarea');
+        t.innerHTML = m[1];                           // décode &amp; &eacute; etc.
+        const titre = t.value.replace(/\s+/g, ' ').trim();
+        return titre || null;
+    }
+
+    function normaliserTitre(titre) {
+        return (titre || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    }
+
+    function lireTitreMemorise(repo, chemin) {
+        const cible = cibles.find(c => c.repo === repo);
+        if (!cible || !cible.titresPages) return null;
+        return cible.titresPages[chemin] || null;     // { titre, maj }
+    }
+
+    function memoriserTitrePage(repo, chemin, titre) {
+        if (!titre) return;
+        const cible = cibles.find(c => c.repo === repo);
+        if (!cible) return;
+        if (!cible.titresPages || typeof cible.titresPages !== 'object') cible.titresPages = {};
+        const actuel = cible.titresPages[chemin];
+        if (actuel && actuel.titre === titre) return;  // rien de neuf : pas de synchro inutile
+        cible.titresPages[chemin] = { titre: titre, maj: new Date().toISOString() };
+        enregistrerCibles(true);
+    }
+
+    async function verifierTitrePageAvantEnvoi(repo, chemin, titreEnvoye, contenuActuel) {
+        // Référence : le titre de la page réellement en ligne (dernier commit,
+        // même s'il a été fait ailleurs qu'avec le Déployeur) ; à défaut, le
+        // titre mémorisé lors du dernier envoi.
+        const titreEnLigne = (contenuActuel !== null) ? extraireTitreHtml(contenuActuel) : null;
+        const memo = lireTitreMemorise(repo, chemin);
+        let reference = null, origine = '';
+        if (titreEnLigne) {
+            reference = titreEnLigne;
+            origine = "lu dans la version actuellement sur GitHub";
+            // On en profite pour mémoriser ce titre s'il ne l'était pas encore.
+            if (!memo || memo.titre !== titreEnLigne) memoriserTitrePage(repo, chemin, titreEnLigne);
+        } else if (memo && memo.titre) {
+            reference = memo.titre;
+            const d = new Date(memo.maj);
+            origine = "mémorisé le " + d.toLocaleDateString('fr-FR') + " à " +
+                      d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        }
+        if (!reference) return true;                               // rien à comparer (nouveau fichier)
+        if (normaliserTitre(reference) === normaliserTitre(titreEnvoye)) return true;
+
+        return await confirmerModal(
+            "⚠️ TITRES DE PAGE DIFFÉRENTS\n\n" +
+            "Dépôt sélectionné : « " + repo + " »" + (chemin !== 'index.html' ? " (" + chemin + ")" : "") + "\n\n" +
+            "Page du dernier commit :\n« " + reference + " »\n(" + origine + ")\n\n" +
+            "Page que tu envoies :\n" + (titreEnvoye ? "« " + titreEnvoye + " »" : "(aucune balise <title>)") + "\n\n" +
+            "As-tu bien sélectionné le bon dépôt ?",
+            "Confirmer le transfert",
+            "Annuler"
+        );
+    }
+
     async function deployerCode() {
         const repo = document.getElementById('select-target').value;
         const code = document.getElementById('html-code').value;
@@ -3573,6 +3646,25 @@
             return;
         }
 
+        // v1.46 : garde-fou « mauvais dépôt » — on compare le titre de la page
+        // envoyée à celui de la page du dernier commit (ou, à défaut, au titre
+        // mémorisé pour ce dépôt).
+        const estPageHtml = /\.html?$/i.test(chemin);
+        const titreEnvoye = estPageHtml ? extraireTitreHtml(code) : null;
+        if (estPageHtml) {
+            const okTitre = await verifierTitrePageAvantEnvoi(repo, chemin, titreEnvoye, contenuActuel);
+            if (!okTitre) {
+                afficherMessage(
+                    "🛑 TRANSFERT ANNULÉ\n\n" +
+                    "Aucun commit n'a été créé. Ton code est toujours dans la zone ci-dessus : " +
+                    "choisis le bon dépôt à l'étape 3 puis relance « Mettre à jour sur GitHub ».",
+                    "error"
+                );
+                return;
+            }
+            afficherMessage(`Envoi de « ${chemin} » vers « ${repo} »...`, "success");
+        }
+
         const codeEncode = encoderBase64(code);
 
         const bodyPayload = {
@@ -3624,6 +3716,9 @@
                 );
                 return;
             }
+
+            // v1.46 : le commit existe, on retient le titre de la page envoyée.
+            if (estPageHtml) memoriserTitrePage(repo, chemin, titreEnvoye);
 
             // Le commit existe : l'historique affiché (celui d'index.html) n'est
             // périmé que si c'est bien index.html qui vient d'être commité.
@@ -4740,6 +4835,9 @@
                 );
                 return;
             }
+
+            // v1.46 : la page en ligne est désormais l'ancienne version → son titre.
+            memoriserTitrePage(repo, "index.html", extraireTitreHtml(ancienContenu));
 
             afficherMessage(`Commit ${shaCommit} créé. Vérification de la version restaurée en ligne...`, "success");
 
@@ -7172,6 +7270,7 @@
     //  liste. Ajouter ici une entrée à CHAQUE nouvelle version.
     // =====================================================================
     const HISTORIQUE_VERSIONS = [
+        ["v1.46", "Garde-fou « mauvais dépôt » : le titre (<title>) de chaque page HTML commitée est mémorisé sur sa cible (local + synchro cibles.json). Avant un envoi depuis l'étape 3, si le titre de la page envoyée diffère de celui de la page du dernier commit (lu sur GitHub, ou mémorisé à défaut), une fenêtre affiche les deux titres pour confirmer ou annuler le transfert. La restauration d'une version met aussi le titre mémorisé à jour."],
         ["v1.45", "Diagnostic automatique quand l'URL de l'appli ne sert pas le code déployé : dès le premier échec de la surveillance, puis toutes les 30 s, le Déployeur cherche la cause — Pages non activé (cas d'un dépôt supprimé puis recréé), dépôt privé (Pages indisponible en offre gratuite), branche ou dossier publiés différents de ceux du déploiement, publication en échec, doublon index.html par la casse — l'explique et propose le remède, avec un bouton quand il est automatisable (activer Pages, corriger la source, relancer la publication). La surveillance reprend d'elle-même après une correction."],
         ["v1.44", "Utilisateur GitHub pré-rempli (Hammerinhank), toujours modifiable : sur un appareil ou un navigateur neuf, seul le token reste à saisir."],
         ["v1.43", "Le libellé au-dessus de la zone de code de l'étape 3 affiche le nom du dépôt concerné, mis à jour à chaque changement d'application cible."],
