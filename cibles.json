@@ -121,8 +121,12 @@
       "name": "Apps Store",
       "repo": "appstore",
       "coche": true
+    },
+    {
+      "name": "Alentours",
+      "repo": "alentours"
     }
   ],
   "derniereCible": "bibliotheque",
-  "maj": "2026-09-24T12:33:47.684Z"
+  "maj": "2026-09-24T12:34:44.345Z"
 }
