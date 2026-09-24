@@ -124,9 +124,15 @@
     },
     {
       "name": "Alentours",
-      "repo": "alentours"
+      "repo": "alentours",
+      "titresPages": {
+        "index.html": {
+          "titre": "Alentours",
+          "maj": "2026-09-24T19:01:21.182Z"
+        }
+      }
     }
   ],
   "derniereCible": "alentours",
-  "maj": "2026-09-24T19:00:13.380Z"
+  "maj": "2026-09-24T19:01:21.183Z"
 }
