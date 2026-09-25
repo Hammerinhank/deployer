@@ -115,7 +115,13 @@
     },
     {
       "name": "Bibliothèque",
-      "repo": "bibliotheque"
+      "repo": "bibliotheque",
+      "titresPages": {
+        "index.html": {
+          "titre": "Bibliothèques",
+          "maj": "2026-09-25T06:51:51.681Z"
+        }
+      }
     },
     {
       "name": "Apps Store",
@@ -134,5 +140,5 @@
     }
   ],
   "derniereCible": "bibliotheque",
-  "maj": "2026-09-25T06:51:48.455Z"
+  "maj": "2026-09-25T06:51:51.681Z"
 }
