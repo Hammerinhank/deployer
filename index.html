@@ -47,6 +47,38 @@
         .section-repliable > summary h2 { margin: 0; }
         .section-contenu { margin-top: 15px; }
 
+        /* v1.48 : page « autres fichiers » — un bloc repliable par sous-répertoire */
+        .groupe-dossier {
+            margin-bottom: 12px;
+            border: 1px solid #d2d2d7;
+            border-radius: 12px;
+            background: #f5f5f7;
+        }
+        .groupe-dossier > summary {
+            list-style: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 14px;
+            font-size: 15px;
+            font-weight: 700;
+            color: #1d1d1f;
+            -webkit-tap-highlight-color: transparent;
+            word-break: break-all;
+        }
+        .groupe-dossier > summary::-webkit-details-marker { display: none; }
+        .groupe-dossier > summary::before {
+            content: "\25B8"; /* ▸ */
+            color: #0071e3;
+            font-size: 15px;
+            transition: transform 0.15s ease;
+            flex-shrink: 0;
+        }
+        .groupe-dossier[open] > summary::before { transform: rotate(90deg); }
+        .groupe-dossier .groupe-nb { font-weight: 400; color: #86868b; font-size: 13px; white-space: nowrap; }
+        .groupe-dossier .groupe-contenu { padding: 0 10px 2px; }
+
         /* Ligne d'URL cliquable affichée sous « Copier l'URL de l'appli » */
         #url-appli-ligne { margin-top: 10px; }
         #url-appli-ligne .url-label { font-size: 12px; color: #86868b; margin-bottom: 4px; }
@@ -632,7 +664,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <button type="button" id="version-badge" onclick="ouvrirHistoriqueVersions()" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:5px 12px;border:none;border-radius:20px;vertical-align:middle;width:auto;cursor:pointer;" title="Voir l'historique des versions">v1.47</button></h1>
+    <h1>🚀 Le Déployeur <button type="button" id="version-badge" onclick="ouvrirHistoriqueVersions()" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:5px 12px;border:none;border-radius:20px;vertical-align:middle;width:auto;cursor:pointer;" title="Voir l'historique des versions">v1.48</button></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -5319,10 +5351,15 @@
                 vide.style.cssText = 'color:#86868b; font-size:13px;';
                 vide.textContent = "Aucun fichier autre que le HTML dans ce dépôt.";
                 blocRepo.appendChild(vide);
-            } else {
+            } else if (fichiers.length <= SEUIL_GROUPES_DOSSIERS) {
                 fichiers.forEach(chemin => {
                     blocRepo.appendChild(construireCarteFichier(cible.repo, chemin, branche));
                 });
+            } else {
+                // v1.48 : au-delà de 5 fichiers, les fichiers rangés dans un
+                // sous-répertoire sont regroupés dans un bloc repliable par dossier
+                // (replié par défaut) ; ceux de la racine restent affichés en tête.
+                ajouterCartesGroupeesParDossier(blocRepo, cible.repo, fichiers, branche);
             }
         } catch (e) {
             const err = document.createElement('p');
@@ -5332,6 +5369,55 @@
         }
 
         zone.appendChild(blocRepo);
+    }
+
+    // ————— v1.48 : regroupement des fichiers par sous-répertoire —————
+    const SEUIL_GROUPES_DOSSIERS = 5;
+
+    function ajouterCartesGroupeesParDossier(blocRepo, repo, fichiers, branche) {
+        const racine = [];
+        const parDossier = new Map();
+        fichiers.forEach(chemin => {
+            const i = chemin.lastIndexOf('/');
+            if (i < 0) { racine.push(chemin); return; }
+            const dossier = chemin.substring(0, i);
+            if (!parDossier.has(dossier)) parDossier.set(dossier, []);
+            parDossier.get(dossier).push(chemin);
+        });
+
+        // Fichiers de la racine : affichés comme avant, sans bloc.
+        racine.forEach(chemin => blocRepo.appendChild(construireCarteFichier(repo, chemin, branche)));
+
+        // Un bloc repliable par sous-répertoire, dans l'ordre alphabétique.
+        Array.from(parDossier.keys()).sort((a, b) => a.localeCompare(b, 'fr')).forEach(dossier => {
+            const liste = parDossier.get(dossier);
+            const groupe = document.createElement('details');
+            groupe.className = 'groupe-dossier';
+            groupe.dataset.dossier = dossier;
+
+            const titre = document.createElement('summary');
+            const nom = document.createElement('span');
+            nom.textContent = '📁 ' + dossier;
+            const nb = document.createElement('span');
+            nb.className = 'groupe-nb';
+            nb.textContent = '— ' + liste.length + (liste.length > 1 ? ' fichiers' : ' fichier');
+            titre.appendChild(nom);
+            titre.appendChild(nb);
+            groupe.appendChild(titre);
+
+            const contenu = document.createElement('div');
+            contenu.className = 'groupe-contenu';
+            liste.forEach(chemin => contenu.appendChild(construireCarteFichier(repo, chemin, branche)));
+            groupe.appendChild(contenu);
+
+            // Une zone de texte masquée ne peut pas calculer sa hauteur : on la
+            // recalcule à l'ouverture du bloc.
+            groupe.addEventListener('toggle', () => {
+                masquerTooltip();
+                if (groupe.open) groupe.querySelectorAll('.commentaire-fichier').forEach(ajusterHauteurCommentaire);
+            });
+            blocRepo.appendChild(groupe);
+        });
     }
 
     // ————— v1.37 : ajout d'un fichier qui n'existe pas encore dans le dépôt —————
@@ -5415,6 +5501,8 @@
         const dejaEnCours = document.querySelector(
             `#autres-fichiers-contenu [data-chemin="${chemin.replace(/"/g, '\\"')}"]`);
         if (dejaEnCours) {
+            const groupeParent = dejaEnCours.closest('details.groupe-dossier');
+            if (groupeParent) groupeParent.open = true;   // v1.48 : carte dans un bloc replié
             afficherStatutNouveauFichier(
                 `Une carte pour « ${chemin} » a déjà été ajoutée plus haut dans cette page.`,
                 "error");
@@ -7292,6 +7380,7 @@
     //  liste. Ajouter ici une entrée à CHAQUE nouvelle version.
     // =====================================================================
     const HISTORIQUE_VERSIONS = [
+        ["v1.48", "Page « autres fichiers » : au-delà de 5 fichiers, ceux rangés dans un sous-répertoire sont regroupés dans des blocs repliables (un par dossier, titré par son chemin avec le nombre de fichiers, repliés par défaut) ; les fichiers de la racine restent affichés en tête. Le contenu des cartes est inchangé."],
         ["v1.47", "Page « autres fichiers », bloc « ➕ Ajouter un fichier au dépôt » : bouton « 📂 Choisir un fichier sur l'iPhone » qui ouvre l'app Fichiers ; le fichier choisi est traité comme un fichier glissé-déposé (nom dans le champ chemin, contenu texte ou binaire placé dans la carte à créer)."],
         ["v1.46", "Garde-fou « mauvais dépôt » : le titre (<title>) de chaque page HTML commitée est mémorisé sur sa cible (local + synchro cibles.json). Avant un envoi depuis l'étape 3, si le titre de la page envoyée diffère de celui de la page du dernier commit (lu sur GitHub, ou mémorisé à défaut), une fenêtre affiche les deux titres pour confirmer ou annuler le transfert. La restauration d'une version met aussi le titre mémorisé à jour."],
         ["v1.45", "Diagnostic automatique quand l'URL de l'appli ne sert pas le code déployé : dès le premier échec de la surveillance, puis toutes les 30 s, le Déployeur cherche la cause — Pages non activé (cas d'un dépôt supprimé puis recréé), dépôt privé (Pages indisponible en offre gratuite), branche ou dossier publiés différents de ceux du déploiement, publication en échec, doublon index.html par la casse — l'explique et propose le remède, avec un bouton quand il est automatisable (activer Pages, corriger la source, relancer la publication). La surveillance reprend d'elle-même après une correction."],
