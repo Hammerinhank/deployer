@@ -632,7 +632,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <button type="button" id="version-badge" onclick="ouvrirHistoriqueVersions()" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:5px 12px;border:none;border-radius:20px;vertical-align:middle;width:auto;cursor:pointer;" title="Voir l'historique des versions">v1.46</button></h1>
+    <h1>🚀 Le Déployeur <button type="button" id="version-badge" onclick="ouvrirHistoriqueVersions()" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:5px 12px;border:none;border-radius:20px;vertical-align:middle;width:auto;cursor:pointer;" title="Voir l'historique des versions">v1.47</button></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -819,6 +819,14 @@
                 …ou glisse-dépose ici un fichier depuis l'iMac :<br>
                 son nom remplira le champ ci-dessus et son contenu la nouvelle carte.
             </div>
+            <!-- v1.47 : sélection d'un fichier depuis l'app Fichiers de l'iPhone -->
+            <input type="file" id="input-fichier-nouveau-iphone"
+                   style="position:absolute; left:-9999px; width:1px; height:1px; opacity:0;"
+                   onchange="fichierChoisiPourNouvelleCarte(this)">
+            <button class="btn" id="btn-choisir-fichier-iphone" type="button"
+                    onclick="document.getElementById('input-fichier-nouveau-iphone').click()"
+                    style="background-color: #007aff; margin-top: 10px;"
+                    data-tip="Ouvre le gestionnaire de fichiers de l'appareil (app Fichiers sur iPhone : iCloud Drive, Sur mon iPhone, Téléchargements…). Le fichier choisi est traité exactement comme un fichier glissé-déposé : son nom remplit le champ chemin et son contenu la future carte. Vérifie ensuite le chemin puis clique « Créer la carte ».">📂 Choisir un fichier sur l'iPhone</button>
             <button class="btn" id="btn-creer-carte-fichier" onclick="creerCarteNouveauFichier()" style="background-color: #34c759; margin-top: 10px;" data-tip="Ajoute en tête de liste une carte vide pour ce chemin. Aucun appel à GitHub n'est fait : la carte fonctionne exactement comme les autres, et c'est le bouton « Mettre à jour sur GitHub » de cette carte qui créera réellement le fichier dans le dépôt.">Créer la carte</button>
             <div id="statut-nouveau-fichier" class="status" style="margin-top:10px;"></div>
         </div>
@@ -5514,6 +5522,21 @@
 
             const fichier = e.dataTransfer.files[0];
             if (!fichier) return;
+            traiterFichierPourNouvelleCarte(fichier);
+        });
+    }
+
+    // v1.47 : fichier choisi via le sélecteur de fichiers (app Fichiers de l'iPhone).
+    function fichierChoisiPourNouvelleCarte(input) {
+        const fichier = input.files && input.files[0];
+        if (fichier) traiterFichierPourNouvelleCarte(fichier);
+        input.value = '';   // permet de re-choisir le même fichier ensuite
+    }
+
+    // Traitement commun (glisser-déposer iMac ou sélecteur de fichiers iPhone) :
+    // le nom remplit le champ « chemin », le contenu est mis de côté pour la carte.
+    function traiterFichierPourNouvelleCarte(fichier) {
+            afficherStatutNouveauFichier(`Lecture de « ${fichier.name} »…`, "success");
 
             // v1.42 : lecture en OCTETS. Le fichier n'est considéré comme texte
             // que s'il est décodable en UTF-8 strict et que son extension est
@@ -5539,7 +5562,6 @@
                     "success");
             }).catch(() => afficherStatutNouveauFichier(
                 `Impossible de lire le fichier « ${fichier.name} ».`, "error"));
-        });
     }
 
     async function dupliquerCommentaireHtml() {
@@ -7270,6 +7292,7 @@
     //  liste. Ajouter ici une entrée à CHAQUE nouvelle version.
     // =====================================================================
     const HISTORIQUE_VERSIONS = [
+        ["v1.47", "Page « autres fichiers », bloc « ➕ Ajouter un fichier au dépôt » : bouton « 📂 Choisir un fichier sur l'iPhone » qui ouvre l'app Fichiers ; le fichier choisi est traité comme un fichier glissé-déposé (nom dans le champ chemin, contenu texte ou binaire placé dans la carte à créer)."],
         ["v1.46", "Garde-fou « mauvais dépôt » : le titre (<title>) de chaque page HTML commitée est mémorisé sur sa cible (local + synchro cibles.json). Avant un envoi depuis l'étape 3, si le titre de la page envoyée diffère de celui de la page du dernier commit (lu sur GitHub, ou mémorisé à défaut), une fenêtre affiche les deux titres pour confirmer ou annuler le transfert. La restauration d'une version met aussi le titre mémorisé à jour."],
         ["v1.45", "Diagnostic automatique quand l'URL de l'appli ne sert pas le code déployé : dès le premier échec de la surveillance, puis toutes les 30 s, le Déployeur cherche la cause — Pages non activé (cas d'un dépôt supprimé puis recréé), dépôt privé (Pages indisponible en offre gratuite), branche ou dossier publiés différents de ceux du déploiement, publication en échec, doublon index.html par la casse — l'explique et propose le remède, avec un bouton quand il est automatisable (activer Pages, corriger la source, relancer la publication). La surveillance reprend d'elle-même après une correction."],
         ["v1.44", "Utilisateur GitHub pré-rempli (Hammerinhank), toujours modifiable : sur un appareil ou un navigateur neuf, seul le token reste à saisir."],
