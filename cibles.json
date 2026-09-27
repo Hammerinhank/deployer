@@ -127,7 +127,8 @@
           "titre": "Bibliothèques",
           "maj": "2026-09-25T06:51:51.681Z"
         }
-      }
+      },
+      "coche": true
     },
     {
       "name": "Apps Store",
@@ -146,5 +147,5 @@
     }
   ],
   "derniereCible": "bibliotheque",
-  "maj": "2026-09-26T17:39:19.521Z"
+  "maj": "2026-09-27T11:45:45.584Z"
 }
