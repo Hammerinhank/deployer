@@ -166,7 +166,13 @@
     {
       "name": "catalogue",
       "repo": "catalogue",
-      "coche": true
+      "coche": true,
+      "titresPages": {
+        "index.html": {
+          "titre": "Catalogue",
+          "maj": "2026-09-28T13:04:52.424Z"
+        }
+      }
     },
     {
       "name": "Catalogue",
@@ -174,5 +180,5 @@
     }
   ],
   "derniereCible": "catalogue",
-  "maj": "2026-09-28T13:04:45.499Z"
+  "maj": "2026-09-28T13:04:52.424Z"
 }
