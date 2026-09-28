@@ -166,8 +166,12 @@
     {
       "name": "Catalogue",
       "repo": "catalogue"
+    },
+    {
+      "name": "catalogue",
+      "repo": "catalogue"
     }
   ],
   "derniereCible": "catalogue",
-  "maj": "2026-09-28T11:35:52.564Z"
+  "maj": "2026-09-28T12:47:51.088Z"
 }
