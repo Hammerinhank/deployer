@@ -47,6 +47,15 @@
         .section-repliable > summary h2 { margin: 0; }
         .section-contenu { margin-top: 15px; }
 
+        /* v1.49 : lien discret dans un libellé (soulignement pointillé, même gris) */
+        .lien-discret {
+            color: inherit;
+            text-decoration: underline dotted #0071e3;
+            text-underline-offset: 3px;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
         /* v1.48 : page « autres fichiers » — un bloc repliable par sous-répertoire */
         .groupe-dossier {
             margin-bottom: 12px;
@@ -664,7 +673,7 @@
 <body>
 
 <div class="container" id="page-principale">
-    <h1>🚀 Le Déployeur <button type="button" id="version-badge" onclick="ouvrirHistoriqueVersions()" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:5px 12px;border:none;border-radius:20px;vertical-align:middle;width:auto;cursor:pointer;" title="Voir l'historique des versions">v1.48</button></h1>
+    <h1>🚀 Le Déployeur <button type="button" id="version-badge" onclick="ouvrirHistoriqueVersions()" style="font-size:14px;color:#fff;background:#0071e3;font-weight:700;padding:5px 12px;border:none;border-radius:20px;vertical-align:middle;width:auto;cursor:pointer;" title="Voir l'historique des versions">v1.49</button></h1>
 
     <!-- 1. CONFIGURATION GITHUB -->
     <div class="card">
@@ -751,8 +760,10 @@
         <label for="select-target">Choisir l'application à mettre à jour</label>
         <select id="select-target"></select>
 
-        <label for="html-code">Colle le nouveau code HTML ici <span style="font-weight:400; color:#86868b;">— ou glisse dessus index.html, ou un fichier déjà présent dans le dépôt <strong id="libelle-depot-html" style="color:#5856d6; font-weight:700;"></strong></span></label>
+        <label for="html-code">Colle le nouveau code HTML ici <span style="font-weight:400; color:#86868b;">— ou <a href="#" id="lien-choisir-fichier-html" class="lien-discret" data-tip="Sur iPhone : touche ici pour choisir un fichier dans l'app Fichiers (il sera traité comme un fichier glissé sur la zone)">glisse dessus</a> index.html, ou un fichier déjà présent dans le dépôt <strong id="libelle-depot-html" style="color:#5856d6; font-weight:700;"></strong></span></label>
         <textarea id="html-code" placeholder="Colle ton code, ou glisse-dépose un fichier .html ici…"></textarea>
+        <input type="file" id="input-fichier-html-iphone"
+               style="position:absolute; left:-9999px; width:1px; height:1px; opacity:0;" tabindex="-1">
 
         <div id="cible-alternative" style="display:none;"></div>
 
@@ -5171,7 +5182,30 @@
 
             const fichier = e.dataTransfer.files[0];
             if (!fichier) return;
+            traiterFichierZoneHtml(fichier, zone);
+        });
 
+        // v1.49 : même traitement via le sélecteur de fichiers (app Fichiers de
+        // l'iPhone), ouvert par le lien « glisse dessus » du libellé.
+        const lien = document.getElementById('lien-choisir-fichier-html');
+        const input = document.getElementById('input-fichier-html-iphone');
+        if (lien && input) {
+            lien.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();          // le libellé ne doit pas juste donner le focus à la zone
+                input.click();
+            });
+            input.addEventListener('change', () => {
+                const fichier = input.files && input.files[0];
+                input.value = '';             // permet de re-choisir le même fichier
+                if (fichier) traiterFichierZoneHtml(fichier, zone);
+            });
+        }
+    }
+
+    // Traitement commun du fichier reçu par la zone de code HTML (glisser-déposer
+    // sur l'iMac, ou sélecteur de fichiers sur l'iPhone).
+    function traiterFichierZoneHtml(fichier, zone) {
             const nom = (fichier.name || '').toLowerCase();
 
             // v1.42 : lecture en OCTETS, puis décodage UTF-8 strict.
@@ -5213,7 +5247,6 @@
                     "success"
                 );
             }).catch(() => afficherMessage(`Impossible de lire le fichier « ${fichier.name} ».`, "error"));
-        });
     }
 
     // Double-clic (iMac) / double-tap (iPhone) dans la zone de code : vide
@@ -7380,6 +7413,7 @@
     //  liste. Ajouter ici une entrée à CHAQUE nouvelle version.
     // =====================================================================
     const HISTORIQUE_VERSIONS = [
+        ["v1.49", "Étape 3 : les mots « glisse dessus » du libellé de la zone de code deviennent un lien discret (souligné en pointillés) qui ouvre l'app Fichiers de l'iPhone ; le fichier choisi suit exactement le même parcours qu'un fichier glissé (index.html chargé, autre fichier du dépôt après confirmation, binaire refusé). Mise en page inchangée."],
         ["v1.48", "Page « autres fichiers » : au-delà de 5 fichiers, ceux rangés dans un sous-répertoire sont regroupés dans des blocs repliables (un par dossier, titré par son chemin avec le nombre de fichiers, repliés par défaut) ; les fichiers de la racine restent affichés en tête. Le contenu des cartes est inchangé."],
         ["v1.47", "Page « autres fichiers », bloc « ➕ Ajouter un fichier au dépôt » : bouton « 📂 Choisir un fichier sur l'iPhone » qui ouvre l'app Fichiers ; le fichier choisi est traité comme un fichier glissé-déposé (nom dans le champ chemin, contenu texte ou binaire placé dans la carte à créer)."],
         ["v1.46", "Garde-fou « mauvais dépôt » : le titre (<title>) de chaque page HTML commitée est mémorisé sur sa cible (local + synchro cibles.json). Avant un envoi depuis l'étape 3, si le titre de la page envoyée diffère de celui de la page du dernier commit (lu sur GitHub, ou mémorisé à défaut), une fenêtre affiche les deux titres pour confirmer ou annuler le transfert. La restauration d'une version met aussi le titre mémorisé à jour."],
