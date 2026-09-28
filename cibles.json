@@ -169,8 +169,8 @@
       "coche": true,
       "titresPages": {
         "index.html": {
-          "titre": "Catalogue",
-          "maj": "2026-09-28T13:04:52.424Z"
+          "titre": "Grande bibliothèque de Gaudissart",
+          "maj": "2026-09-28T13:05:20.343Z"
         }
       }
     },
@@ -180,5 +180,5 @@
     }
   ],
   "derniereCible": "catalogue",
-  "maj": "2026-09-28T13:04:52.424Z"
+  "maj": "2026-09-28T13:05:20.343Z"
 }
