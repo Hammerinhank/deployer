@@ -162,8 +162,12 @@
           "maj": "2026-09-24T19:01:21.182Z"
         }
       }
+    },
+    {
+      "name": "Catalogue",
+      "repo": "catalogue"
     }
   ],
   "derniereCible": "bibliotheque",
-  "maj": "2026-09-28T10:44:39.658Z"
+  "maj": "2026-09-28T11:35:45.865Z"
 }
